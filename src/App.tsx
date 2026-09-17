@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Activity, ArrowRight, Bot as BotIcon, Check, ChevronDown, ChevronRight, CircleHelp, Database, LayoutDashboard, Layers3, ListChecks, MoreHorizontal, Play, Plus, Power, Radio, RotateCcw, ScrollText, Search, Settings2, ShieldCheck, Users, X } from 'lucide-react';
 import { bbotClient as client } from './client';
-import { botStates, type AccountKind, type Bot, type BotState, type InstanceStatus, type JobStatus, type LogEntry, type Snapshot } from './client/types';
+import { botStates, validMinecraftUsername, type AccountKind, type Bot, type BotState, type InstanceStatus, type JobStatus, type LogEntry, type Snapshot, type TradeItem, type TradeState } from './client/types';
 type Page = 'dashboard'|'bots'|'instances'|'jobs'|'accounts'|'settings'|'logs';
 const nav:{id:Page;label:string;icon:typeof LayoutDashboard}[] = [
   {id:'dashboard',label:'Overview',icon:LayoutDashboard},{id:'bots',label:'Bots',icon:BotIcon},
@@ -15,7 +15,28 @@ const rel=(time:number)=>{const m=Math.max(0,Math.floor((Date.now()-time)/60000)
 function Badge({status,label}:{status:string;label?:string}){return <span className={`badge ${tone(status)}`}><span className="badge-dot" aria-hidden="true" />{label??status}</span>}
 function Empty({title,detail}:{title:string;detail:string}){return <div className="empty"><Database size={26}/><strong>{title}</strong><p>{detail}</p></div>}
 function SectionHead({kicker,title,action}:{kicker?:string;title:string;action?:React.ReactNode}){return <div className="section-head"><div>{kicker&&<span className="eyebrow">{kicker}</span>}<h2>{title}</h2></div>{action}</div>}
-function BotCard({bot,compact,onAction}:{bot:Bot;compact?:boolean;onAction:(task:()=>void)=>void}){
+function TradePanel({bot,trade,onAction}:{bot:Bot;trade:TradeState;onAction:(task:()=>void)=>void}){
+  const [expanded,setExpanded]=useState(false),[username,setUsername]=useState(''),[selected,setSelected]=useState<TradeItem|null>(null),[pending,setPending]=useState(false);
+  const busy=['REQUESTING','WAITING_FOR_GUI','OPEN'].includes(trade.status),window=trade.window;
+  useEffect(()=>setPending(false),[trade.revision]);
+  const grid=(label:string,items:(TradeItem|null)[],offset:number)=>
+    <section className="trade-section"><h4>{label}</h4><div className="trade-grid">{items.map((item,index)=><button key={index} className="trade-slot" aria-label={`${label} slot ${index+1}${item?`: ${item.name} x${item.count}`:''}`} disabled={pending||trade.status!=='OPEN'} onClick={()=>{if(item)setSelected(item);if(!item)return;setPending(true);try{client.clickTradeSlot(bot.id,{tradeSessionId:trade.tradeSessionId!,windowId:window!.windowId,slot:offset+index,revision:trade.revision});}catch{setPending(false);}}}>{item&&<><span className="trade-icon">{item.icon??'▣'}</span><span className="trade-item-name">{item.name}</span><small>x{item.count}</small></>}</button>)}</div></section>;
+  return <div className="trade-panel"><button className="mini trade-toggle" aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>Trade</button>
+    {expanded&&<div className="trade-content"><strong>Target Player</strong>
+      {!busy&&<><label className="field-label" htmlFor={`trade-${bot.id}`}>Minecraft username</label><input id={`trade-${bot.id}`} value={username} maxLength={16} autoComplete="off" spellCheck={false} onChange={e=>setUsername(e.target.value)} placeholder="PlayerName"/>
+        {username&&!validMinecraftUsername(username)&&<small className="trade-error">1〜16文字の英数字と _ を入力してください</small>}
+        <div className="trade-actions"><button className="button accent" disabled={!validMinecraftUsername(username)} onClick={()=>onAction(()=>client.startTrade(bot.id,username))}>Send Trade</button><button className="button outline" onClick={()=>{setExpanded(false);setUsername('')}}>Cancel</button></div></>}
+      {trade.targetUsername&&trade.status!=='IDLE'&&<p>Trading with: <b>{trade.targetUsername}</b></p>}
+      {trade.status==='WAITING_FOR_GUI'&&<p role="status">Waiting for Trade GUI...</p>}
+      {trade.status==='TIMEOUT'&&<p role="alert" className="trade-error">Error: Trade GUI timeout</p>}
+      {trade.status==='ERROR'&&<p role="alert" className="trade-error">Error: {trade.error??'Trade failed'}</p>}
+      {['CLOSED','COMPLETED'].includes(trade.status)&&<p role="status">Trade {trade.status.toLowerCase()}</p>}
+      {busy&&<div className="trade-actions"><button className="button outline" onClick={()=>onAction(()=>client.cancelTrade(bot.id))}>Cancel Trade</button>{client.mode==='mock'&&trade.status==='WAITING_FOR_GUI'&&<button className="button outline" onClick={()=>onAction(()=>client.simulateTradeTimeout(bot.id))}>Simulate Timeout</button>}</div>}
+      {window&&trade.status==='OPEN'&&<div className="trade-window"><p className="mono">{window.title} · revision {trade.revision}</p>{grid('Trade Window',window.slots,0)}{grid('Inventory',window.inventory,window.slotCount)}{grid('Hotbar',window.hotbar,window.slotCount+27)}{selected&&<div className="trade-item-detail"><b>{selected.name} x{selected.count}</b>{selected.lore?.map((line,i)=><span key={i}>{line}</span>)}{selected.enchantments?.map((line,i)=><span key={i}>{line}</span>)}{selected.durability!==undefined&&<span>Durability: {selected.durability}</span>}{selected.metadata!==undefined&&<span>Metadata: {selected.metadata}</span>}<button onClick={()=>setSelected(null)}>Close</button></div>}</div>}
+    </div>}
+  </div>;
+}
+function BotCard({bot,compact,onAction,trade}:{bot:Bot;compact?:boolean;onAction:(task:()=>void)=>void;trade?:TradeState}){
   const active=bot.state!=='DISCONNECTED';
   return <article className={`bot-card ${compact?'compact':''}`}>
     <div className="bot-main"><div className={`bot-avatar ${tone(bot.state)}`}><BotIcon size={21} strokeWidth={1.8}/></div>
@@ -28,6 +49,7 @@ function BotCard({bot,compact,onAction}:{bot:Bot;compact?:boolean;onAction:(task
       {!compact&&<label className="select-wrap"><span className="sr-only">{bot.name} の状態</span><select value={bot.state} onChange={e=>onAction(()=>client.setBotState(bot.id,e.target.value as BotState))} aria-label={`${bot.name} の状態を試す`}>
         {botStates.map(s=><option key={s} value={s}>{s}</option>)}</select><ChevronDown size={13}/></label>}
     </div>
+    {!compact&&trade&&<TradePanel bot={bot} trade={trade} onAction={onAction}/>}
   </article>
 }
 function InstanceCard({id,status,count,lastSeen,onAction}:{id:string;status:InstanceStatus;count:number;lastSeen:number;onAction:(task:()=>void)=>void}){
@@ -67,7 +89,7 @@ function App(){
       {page==='dashboard'&&<Dashboard data={snapshot} active={active} live={live} pending={pending} go={go} perform={perform}/>}
       {page==='bots'&&<section className="view-section"><div className="toolbar"><div className="filter-row" role="group" aria-label="Bot絞り込み">{[['all','All'],['active','Active'],['idle','Idle'],['offline','Offline']].map(([v,l])=><button key={v} className={`filter ${filter===v?'is-active':''}`} onClick={()=>setFilter(v)}>{l}</button>)}</div><div className="search-box"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Bot / Instance を検索" aria-label="Bot検索"/></div></div>
         <div className="list-label">FLEET <span>{snapshot.bots.length} / {snapshot.settings.maxBots} BOTS</span></div>
-        <div className="bot-grid">{snapshot.bots.filter(b=>(filter==='all'||filter==='active'&&b.state!=='DISCONNECTED'||filter==='offline'&&b.state==='DISCONNECTED'||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.id.includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase()))).map(b=><BotCard key={b.id} bot={b} onAction={perform}/>)}</div>
+        <div className="bot-grid">{snapshot.bots.filter(b=>(filter==='all'||filter==='active'&&b.state!=='DISCONNECTED'||filter==='offline'&&b.state==='DISCONNECTED'||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.id.includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase()))).map(b=><BotCard key={b.id} bot={b} trade={snapshot.trades[b.id]??client.getTradeState(b.id)} onAction={perform}/>)}</div>
         {!snapshot.bots.some(b=>(filter==='all'||filter==='active'&&b.state!=='DISCONNECTED'||filter==='offline'&&b.state==='DISCONNECTED'||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase())))&&<Empty title="該当するBotがありません" detail="条件を変更して確認してください。"/>}</section>}
       {page==='instances'&&<section className="view-section"><div className="insight"><Activity size={18}/><p>Instance一覧は固定ではありません。Mockで追加・状態変更を試せます。確認済みの集合であり、総instance数ではありません。</p></div>
         <div className="list-label">OBSERVED INSTANCES <span>{snapshot.instances.length} FOUND</span></div><div className="instance-grid">{snapshot.instances.map(i=><InstanceCard key={i.id} id={i.id} status={i.status} count={snapshot.bots.filter(b=>b.instanceId===i.id).length} lastSeen={i.lastSeen} onAction={perform}/>)}</div></section>}
