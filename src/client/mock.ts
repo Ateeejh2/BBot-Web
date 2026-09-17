@@ -1,4 +1,4 @@
-import { botStates, validMinecraftUsername, type AccountKind, type BBotClient, type Bot, type BotState, type InstanceStatus, type JobStatus, type Settings, type Snapshot, type TradeClickRequest, type TradeItem, type TradeState, type TradeWindow } from './types';
+import { botStates, canSendMinecraftCommand, validMinecraftUsername, type AccountKind, type BBotClient, type Bot, type BotState, type InstanceStatus, type JobStatus, type PartyCommandResult, type Settings, type Snapshot, type TradeClickRequest, type TradeItem, type TradeState, type TradeWindow } from './types';
 const stamp = Date.now();
 const initial = ():Snapshot => ({
   bots: [
@@ -88,6 +88,19 @@ export class MockBBotClient implements BBotClient {
     s.logs = [{id:++this.sequence,at:Date.now(),level,message,...meta},...s.logs].slice(0,120);
   }
   private getBot(s:Snapshot,id:string) {const b=s.bots.find(x=>x.id===id);if(!b)throw Error('Bot が見つかりません');return b;}
+  inviteParty(id:string,targetUsername:string):PartyCommandResult {
+    if(!validMinecraftUsername(targetUsername))throw Error('Minecraft ID は1〜16文字の英数字と _ のみです');
+    const bot=this.getBot(this.snapshot,id);
+    if(!canSendMinecraftCommand(bot.state))throw Error(`${bot.name} は現在commandを送信できません`);
+    this.update(s=>this.log(s,`Mock Party invite: ${targetUsername}`,'INFO',{botId:id}));
+    return {status:'SENT',message:`Party command sent to ${targetUsername}`};
+  }
+  warpParty(id:string):PartyCommandResult {
+    const bot=this.getBot(this.snapshot,id);
+    if(!canSendMinecraftCommand(bot.state))throw Error(`${bot.name} は現在commandを送信できません`);
+    this.update(s=>this.log(s,'Mock Party warp','INFO',{botId:id}));
+    return {status:'SENT',message:'Party warp command sent'};
+  }
   private leave(s:Snapshot,b:Bot) {
     if (b.jobId) {const job=s.jobs.find(j=>j.id===b.jobId);if(job && ['ASSIGNED','RUNNING'].includes(job.state)) {job.state='QUEUED';job.botId=undefined;}}
     b.jobId=undefined;b.instanceId=undefined;

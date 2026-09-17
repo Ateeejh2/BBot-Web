@@ -15,6 +15,8 @@ export interface TradeWindow { windowId:number; title:string; type:string; slotC
 export interface TradeState { status:TradeStatus; tradeSessionId:string|null; targetUsername:string|null; revision:number; window:TradeWindow|null; error?:string }
 export interface TradeClickRequest { tradeSessionId:string; windowId:number; slot:number; revision:number }
 export const validMinecraftUsername = (value:string):boolean => /^[A-Za-z0-9_]{1,16}$/.test(value);
+export const canSendMinecraftCommand = (state:BotState):boolean => ['LOBBY','IN_PIT_IDLE','PATHFINDING','WORKING'].includes(state);
+export interface PartyCommandResult { status:'SENT'|'REJECTED'; message:string; serverMessage?:string }
 export interface Snapshot { bots:Bot[]; instances:Instance[]; jobs:Job[]; accounts:Account[]; logs:LogEntry[]; settings:Settings; trades:Record<string,TradeState>; revision:number }
 export interface BBotClient {
   readonly mode:'mock'|'remote';
@@ -26,6 +28,8 @@ export interface BBotClient {
   cancelTrade(botId:string):void;
   /** Mock-only debug operation; remote implementations must reject it. */
   simulateTradeTimeout(botId:string):void;
+  inviteParty(botId:string,targetUsername:string):PartyCommandResult|Promise<PartyCommandResult>;
+  warpParty(botId:string):PartyCommandResult|Promise<PartyCommandResult>;
   startBot(id:string):void;
   stopBot(id:string):void;
   recoverBot(id:string):void;

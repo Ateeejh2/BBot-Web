@@ -6,6 +6,7 @@ const server = await createServer({ server:{ middlewareMode:true },appType:'cust
 try {
   const { MockBBotClient } = await server.ssrLoadModule('/src/client/mock.ts');
   const { validMinecraftUsername } = await server.ssrLoadModule('/src/client/types.ts');
+  const { sendPartyInvite,sendPartyWarp } = await server.ssrLoadModule('/src/server/party.ts');
   const { App } = await server.ssrLoadModule('/src/App.tsx');
   const client = new MockBBotClient();
   let updates=0;const unsubscribe=client.subscribe(()=>updates++);
@@ -66,8 +67,27 @@ try {
   client.startTrade('bot-02','Separate');client.setBotState('bot-02','LOBBY');
   assert.equal(client.getTradeState('bot-02').status,'CLOSED');
   assert.equal(client.getTradeState('bot-03').status,'IDLE');
+  const partyBot=client.getSnapshot().bots.find(b=>b.id==='bot-04');
+  assert.equal(client.inviteParty(partyBot.id,'Example_Player').message,'Party command sent to Example_Player');
+  assert.equal(client.warpParty(partyBot.id).message,'Party warp command sent');
+  assert.throws(()=>client.inviteParty(partyBot.id,'/p Someone'));
+  assert.throws(()=>client.inviteParty(partyBot.id,'Name; /stop'));
+  assert.throws(()=>client.inviteParty('bot-06','Player'));
+  assert.throws(()=>client.warpParty('bot-06'));
+  assert.equal(client.getSnapshot().logs[0].botId,partyBot.id);
+  const commands=[];
+  const backendBots=new Map([['bot-01',{id:'bot-01',state:'IN_PIT_IDLE',chat:command=>commands.push(['bot-01',command])}],['bot-02',{id:'bot-02',state:'LOBBY',chat:command=>commands.push(['bot-02',command])}],['bot-06',{id:'bot-06',state:'DISCONNECTED',chat:command=>commands.push(['bot-06',command])}]]);
+  const resolve=id=>backendBots.get(id);
+  assert.equal(sendPartyInvite(resolve,'bot-02',{targetUsername:'ExamplePlayer'}).status,'SENT');
+  assert.equal(sendPartyWarp(resolve,'bot-01').status,'SENT');
+  assert.deepEqual(commands,[['bot-02','/p ExamplePlayer'],['bot-01','/p warp']]);
+  for(const body of [{targetUsername:'Player',command:'/stop'},{command:'/p Player'},{targetUsername:'A; /stop'},{targetUsername:'/p Player'},{targetUsername:''}])assert.throws(()=>sendPartyInvite(resolve,'bot-01',body));
+  assert.throws(()=>sendPartyWarp(resolve,'bot-01',{command:'/anything'}));
+  assert.throws(()=>sendPartyInvite(resolve,'bot-06',{targetUsername:'Player'}));
+  assert.throws(()=>sendPartyWarp(resolve,'bot-06'));
+  assert.deepEqual(commands,[['bot-02','/p ExamplePlayer'],['bot-01','/p warp']]);
   const html=renderToString(createElement(App));
   assert.ok(html.includes('Command center')&&html.includes('Java 1.8.9'));
   client.reset();assert.equal(client.getSnapshot().bots.length,6);
-  console.log('Mock operations, Trade isolation/validation/click/timeout, and server render: OK');
+  console.log('Mock Trade and Party/Warp validation, Bot isolation, backend command dispatch, and server render: OK');
 } finally { await server.close(); }

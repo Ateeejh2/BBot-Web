@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Activity, ArrowRight, Bot as BotIcon, Check, ChevronDown, ChevronRight, CircleHelp, Database, LayoutDashboard, Layers3, ListChecks, MoreHorizontal, Play, Plus, Power, Radio, RotateCcw, ScrollText, Search, Settings2, ShieldCheck, Users, X } from 'lucide-react';
 import { bbotClient as client } from './client';
-import { botStates, validMinecraftUsername, type AccountKind, type Bot, type BotState, type InstanceStatus, type JobStatus, type LogEntry, type Snapshot, type TradeItem, type TradeState } from './client/types';
+import { botStates, validMinecraftUsername, type AccountKind, type Bot, type BotState, type InstanceStatus, type JobStatus, type LogEntry, type PartyCommandResult, type Snapshot, type TradeItem, type TradeState } from './client/types';
 type Page = 'dashboard'|'bots'|'instances'|'jobs'|'accounts'|'settings'|'logs';
 const nav:{id:Page;label:string;icon:typeof LayoutDashboard}[] = [
   {id:'dashboard',label:'Overview',icon:LayoutDashboard},{id:'bots',label:'Bots',icon:BotIcon},
@@ -16,12 +16,19 @@ function Badge({status,label}:{status:string;label?:string}){return <span classN
 function Empty({title,detail}:{title:string;detail:string}){return <div className="empty"><Database size={26}/><strong>{title}</strong><p>{detail}</p></div>}
 function SectionHead({kicker,title,action}:{kicker?:string;title:string;action?:React.ReactNode}){return <div className="section-head"><div>{kicker&&<span className="eyebrow">{kicker}</span>}<h2>{title}</h2></div>{action}</div>}
 function TradePanel({bot,trade,onAction}:{bot:Bot;trade:TradeState;onAction:(task:()=>void)=>void}){
-  const [expanded,setExpanded]=useState(false),[username,setUsername]=useState(''),[selected,setSelected]=useState<TradeItem|null>(null),[pending,setPending]=useState(false);
+  const [expanded,setExpanded]=useState(false),[partyOpen,setPartyOpen]=useState(false),[partyUsername,setPartyUsername]=useState(''),[notice,setNotice]=useState(''),[noticeError,setNoticeError]=useState(false),[partyPending,setPartyPending]=useState(false);
+  const [username,setUsername]=useState(''),[selected,setSelected]=useState<TradeItem|null>(null),[pending,setPending]=useState(false);
   const busy=['REQUESTING','WAITING_FOR_GUI','OPEN'].includes(trade.status),window=trade.window;
   useEffect(()=>setPending(false),[trade.revision]);
+  useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(''),3700);return()=>clearTimeout(timer)},[notice]);
+  const runParty=async(action:()=>PartyCommandResult|Promise<PartyCommandResult>)=>{if(partyPending)return;setPartyPending(true);try{const result=await action();setNotice(result.serverMessage??result.message);setNoticeError(result.status==='REJECTED');if(result.status==='SENT')setPartyOpen(false);}catch(err){setNotice(err instanceof Error?err.message:'操作に失敗しました');setNoticeError(true);}finally{setPartyPending(false)}};
   const grid=(label:string,items:(TradeItem|null)[],offset:number)=>
     <section className="trade-section"><h4>{label}</h4><div className="trade-grid">{items.map((item,index)=><button key={index} className="trade-slot" aria-label={`${label} slot ${index+1}${item?`: ${item.name} x${item.count}`:''}`} disabled={pending||trade.status!=='OPEN'} onClick={()=>{if(item)setSelected(item);if(!item)return;setPending(true);try{client.clickTradeSlot(bot.id,{tradeSessionId:trade.tradeSessionId!,windowId:window!.windowId,slot:offset+index,revision:trade.revision});}catch{setPending(false);}}}>{item&&<><span className="trade-icon">{item.icon??'▣'}</span><span className="trade-item-name">{item.name}</span><small>x{item.count}</small></>}</button>)}</div></section>;
-  return <div className="trade-panel"><button className="mini trade-toggle" aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>Trade</button>
+  return <div className="trade-panel"><div className="bot-command-actions"><button className="mini trade-toggle" aria-expanded={expanded} onClick={()=>{setExpanded(!expanded);setPartyOpen(false)}}>Trade</button><button className="mini" aria-expanded={partyOpen} onClick={()=>{setPartyOpen(!partyOpen);setExpanded(false)}}>Party</button><button className="mini" disabled={partyPending} onClick={()=>runParty(()=>client.warpParty(bot.id))}>Warp</button></div>
+    {notice&&<p className={noticeError?'trade-error':'trade-notice'} role={noticeError?'alert':'status'}>{notice}</p>}
+    {partyOpen&&<div className="trade-content"><strong>Party</strong><label className="field-label" htmlFor={`party-${bot.id}`}>Minecraft ID</label><input id={`party-${bot.id}`} value={partyUsername} maxLength={16} autoComplete="off" spellCheck={false} onChange={e=>setPartyUsername(e.target.value)} placeholder="ExamplePlayer"/>
+      {partyUsername&&!validMinecraftUsername(partyUsername)&&<small className="trade-error">1〜16文字の英数字と _ を入力してください</small>}
+      <div className="trade-actions"><button className="button accent" disabled={partyPending||!validMinecraftUsername(partyUsername)} onClick={()=>runParty(()=>client.inviteParty(bot.id,partyUsername))}>Send Party</button><button className="button outline" onClick={()=>{setPartyOpen(false);setPartyUsername('')}}>Cancel</button></div></div>}
     {expanded&&<div className="trade-content"><strong>Target Player</strong>
       {!busy&&<><label className="field-label" htmlFor={`trade-${bot.id}`}>Minecraft username</label><input id={`trade-${bot.id}`} value={username} maxLength={16} autoComplete="off" spellCheck={false} onChange={e=>setUsername(e.target.value)} placeholder="PlayerName"/>
         {username&&!validMinecraftUsername(username)&&<small className="trade-error">1〜16文字の英数字と _ を入力してください</small>}
