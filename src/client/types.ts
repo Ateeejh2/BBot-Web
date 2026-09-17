@@ -1,3 +1,4 @@
+import type { ReconnectResult, ServerConnection, ServerConnectionRecord } from './serverConnection';
 export const botStates = ['DISCONNECTED','CONNECTING','LOBBY','JOINING_PIT','IN_PIT_IDLE','PATHFINDING','WORKING','RECOVERING'] as const;
 export type BotState = typeof botStates[number];
 export type InstanceStatus = 'ACTIVE' | 'SUSPECT' | 'INACTIVE';
@@ -16,12 +17,16 @@ export interface TradeState { status:TradeStatus; tradeSessionId:string|null; ta
 export interface TradeClickRequest { tradeSessionId:string; windowId:number; slot:number; revision:number }
 export const validMinecraftUsername = (value:string):boolean => /^[A-Za-z0-9_]{1,16}$/.test(value);
 export const canSendMinecraftCommand = (state:BotState):boolean => ['LOBBY','IN_PIT_IDLE','PATHFINDING','WORKING'].includes(state);
+export const isConnectedBot = (state:BotState):boolean => ['LOBBY','JOINING_PIT','IN_PIT_IDLE','PATHFINDING','WORKING'].includes(state);
 export interface PartyCommandResult { status:'SENT'|'REJECTED'; message:string; serverMessage?:string }
-export interface Snapshot { bots:Bot[]; instances:Instance[]; jobs:Job[]; accounts:Account[]; logs:LogEntry[]; settings:Settings; trades:Record<string,TradeState>; revision:number }
+export interface Snapshot { bots:Bot[]; instances:Instance[]; jobs:Job[]; accounts:Account[]; logs:LogEntry[]; settings:Settings; serverConnection:ServerConnectionRecord; trades:Record<string,TradeState>; revision:number }
 export interface BBotClient {
   readonly mode:'mock'|'remote';
   getSnapshot():Snapshot;
   subscribe(listener:()=>void):()=>void;
+  getServerConnection():ServerConnectionRecord|Promise<ServerConnectionRecord>;
+  saveServerConnection(next:ServerConnection):ServerConnectionRecord|Promise<ServerConnectionRecord>;
+  reconnectServer(serverRevision:number):ReconnectResult|Promise<ReconnectResult>;
   getTradeState(botId:string):TradeState;
   startTrade(botId:string,targetUsername:string):void;
   clickTradeSlot(botId:string,request:TradeClickRequest):void;

@@ -1,4 +1,5 @@
-import { botStates, canSendMinecraftCommand, validMinecraftUsername, type AccountKind, type BBotClient, type Bot, type BotState, type InstanceStatus, type JobStatus, type PartyCommandResult, type Settings, type Snapshot, type TradeClickRequest, type TradeItem, type TradeState, type TradeWindow } from './types';
+import { botStates, canSendMinecraftCommand, isConnectedBot, validMinecraftUsername, type AccountKind, type BBotClient, type Bot, type BotState, type InstanceStatus, type JobStatus, type PartyCommandResult, type Settings, type Snapshot, type TradeClickRequest, type TradeItem, type TradeState, type TradeWindow } from './types';
+import { defaultServerConnection, validateServerConnection, type ReconnectResult, type ServerConnection, type ServerConnectionRecord } from './serverConnection';
 const stamp = Date.now();
 const initial = ():Snapshot => ({
   bots: [
@@ -28,8 +29,9 @@ const initial = ():Snapshot => ({
     {id:3,at:stamp-6300,level:'INFO',message:'Job を割り当てました',botId:'bot-02',instanceId:'mini02',jobId:'job-021'},
     {id:4,at:stamp-4000,level:'WARN',message:'Instance の状態を SUSPECT に変更しました',instanceId:'mega03a'},
   ],
-  settings:{maxBots:20,pathConcurrency:2,eventPollingSeconds:10,debug:false,javaVersion:'1.8.9'},trades:{},revision:0
+  settings:{maxBots:20,pathConcurrency:2,eventPollingSeconds:10,debug:false,javaVersion:'1.8.9'},serverConnection:{...defaultServerConnection},trades:{},revision:0
 });
+export const MOCK_CONNECTION_SPACING_MS = 120;
 const availableStates = new Set<string>(botStates);
 const idleTrade = ():TradeState => ({status:'IDLE',tradeSessionId:null,targetUsername:null,revision:0,window:null});
 const item = (name:string,count:number,lore:string[],icon:string):TradeItem => ({name,count,lore,icon});
@@ -44,6 +46,33 @@ export class MockBBotClient implements BBotClient {
   private listeners = new Set<()=>void>();
   private sequence = 100;
   private tradeGeneration = new Map<string,number>();
+  private reconnectGeneration = 0;
+  private botConnectionGeneration = new Map<string,number>();
+  private reconnectInFlight = new Map<string,{generation:number;previous:Bot;job?:Snapshot['jobs'][number]}>();
+  private nextBotConnectionGeneration(id:string){const next=(this.botConnectionGeneration.get(id)??0)+1;this.botConnectionGeneration.set(id,next);return next;}
+  private cancelReconnects(){this.reconnectGeneration++;if(this.reconnectInFlight.size){this.update(s=>{for(const [id,entry] of this.reconnectInFlight){const bot=s.bots.find(b=>b.id===id);if(bot?.state==='CONNECTING'&&this.botConnectionGeneration.get(id)===entry.generation){Object.assign(bot,entry.previous);if(entry.job){const job=s.jobs.find(j=>j.id===entry.job!.id);if(job)Object.assign(job,entry.job);}}}this.reconnectInFlight.clear();});}}
+  getServerConnection = ():ServerConnectionRecord => this.snapshot.serverConnection;
+  saveServerConnection(next:ServerConnection):ServerConnectionRecord {
+    const valid=validateServerConnection(next);this.cancelReconnects();
+    this.update(s=>{s.serverConnection={...valid,revision:s.serverConnection.revision+1};this.log(s,`Server Connection を保存: ${valid.host}:${valid.port}`);});
+    return this.snapshot.serverConnection;
+  }
+  reconnectServer(serverRevision:number):ReconnectResult {
+    if(!Number.isInteger(serverRevision)||serverRevision!==this.snapshot.serverConnection.revision)throw Error('Server Connection のrevisionが古いです');
+    this.cancelReconnects();const campaign=this.reconnectGeneration;
+    const targets=this.snapshot.bots.filter(b=>isConnectedBot(b.state)).map(b=>({id:b.id,state:b.state,generation:this.botConnectionGeneration.get(b.id)??0}));
+    for(const [index,target] of targets.entries())setTimeout(()=>{
+      if(campaign!==this.reconnectGeneration||serverRevision!==this.snapshot.serverConnection.revision||(this.botConnectionGeneration.get(target.id)??0)!==target.generation)return;
+      const current=this.snapshot.bots.find(b=>b.id===target.id);if(current?.state!==target.state)return;
+      this.invalidateTrade(target.id);const generation=this.nextBotConnectionGeneration(target.id);
+      this.reconnectInFlight.set(target.id,{generation,previous:structuredClone(current),job:current.jobId?structuredClone(this.snapshot.jobs.find(j=>j.id===current.jobId)):undefined});
+      this.update(s=>{const bot=this.getBot(s,target.id);this.leave(s,bot);bot.state='CONNECTING';bot.updatedAt=Date.now();this.log(s,`${bot.name} をMock再接続中`,'INFO',{botId:target.id});});
+      setTimeout(()=>{if(campaign!==this.reconnectGeneration||serverRevision!==this.snapshot.serverConnection.revision||this.botConnectionGeneration.get(target.id)!==generation)return;
+        this.reconnectInFlight.delete(target.id);this.update(s=>{const bot=this.getBot(s,target.id);if(bot.state!=='CONNECTING')return;bot.state='LOBBY';bot.updatedAt=Date.now();this.log(s,`${bot.name} のMock再接続が完了`,'INFO',{botId:target.id});});
+      },80);
+    },index*MOCK_CONNECTION_SPACING_MS);
+    return {botIds:targets.map(t=>t.id),serverRevision};
+  }
   private nextGeneration(id:string){const n=(this.tradeGeneration.get(id)??0)+1;this.tradeGeneration.set(id,n);return n;}
   getTradeState = (id:string):TradeState => this.snapshot.trades[id]??idleTrade();
   startTrade(id:string,targetUsername:string){
@@ -105,11 +134,12 @@ export class MockBBotClient implements BBotClient {
     if (b.jobId) {const job=s.jobs.find(j=>j.id===b.jobId);if(job && ['ASSIGNED','RUNNING'].includes(job.state)) {job.state='QUEUED';job.botId=undefined;}}
     b.jobId=undefined;b.instanceId=undefined;
   }
-  startBot(id:string) {this.update(s=>{const b=this.getBot(s,id);if(!['DISCONNECTED','LOBBY','RECOVERING'].includes(b.state))return;
+  startBot(id:string) {this.nextBotConnectionGeneration(id);this.update(s=>{const b=this.getBot(s,id);if(!['DISCONNECTED','LOBBY','RECOVERING'].includes(b.state))return;
     b.state=b.state==='DISCONNECTED'?'CONNECTING':'JOINING_PIT';b.updatedAt=Date.now();this.log(s,`${b.name} の起動をシミュレート`, 'INFO',{botId:id});});}
-  stopBot(id:string) {this.invalidateTrade(id);this.update(s=>{const b=this.getBot(s,id);if(b.state==='DISCONNECTED')return;this.leave(s,b);b.state='DISCONNECTED';b.updatedAt=Date.now();this.log(s,`${b.name} を停止`, 'INFO',{botId:id});});}
-  recoverBot(id:string) {this.invalidateTrade(id);this.update(s=>{const b=this.getBot(s,id);if(b.state==='DISCONNECTED')return;this.leave(s,b);b.state='RECOVERING';b.updatedAt=Date.now();this.log(s,`${b.name} を復旧状態に変更`, 'WARN',{botId:id});});}
+  stopBot(id:string) {this.nextBotConnectionGeneration(id);this.reconnectInFlight.delete(id);this.invalidateTrade(id);this.update(s=>{const b=this.getBot(s,id);if(b.state==='DISCONNECTED')return;this.leave(s,b);b.state='DISCONNECTED';b.updatedAt=Date.now();this.log(s,`${b.name} を停止`, 'INFO',{botId:id});});}
+  recoverBot(id:string) {this.nextBotConnectionGeneration(id);this.reconnectInFlight.delete(id);this.invalidateTrade(id);this.update(s=>{const b=this.getBot(s,id);if(b.state==='DISCONNECTED')return;this.leave(s,b);b.state='RECOVERING';b.updatedAt=Date.now();this.log(s,`${b.name} を復旧状態に変更`, 'WARN',{botId:id});});}
   setBotState(id:string,state:BotState) {if(!availableStates.has(state))return;
+    this.nextBotConnectionGeneration(id);this.reconnectInFlight.delete(id);
     if(['DISCONNECTED','CONNECTING','LOBBY','JOINING_PIT','RECOVERING'].includes(state))this.invalidateTrade(id);
     this.update(s=>{const b=this.getBot(s,id);if(['DISCONNECTED','CONNECTING','LOBBY','JOINING_PIT','RECOVERING'].includes(state))this.leave(s,b);
       if(['IN_PIT_IDLE','PATHFINDING','WORKING'].includes(state) && !b.instanceId)b.instanceId=s.instances.find(i=>i.status==='ACTIVE')?.id;
@@ -141,5 +171,5 @@ export class MockBBotClient implements BBotClient {
     if(next.pathConcurrency!==undefined&&(next.pathConcurrency<1||next.pathConcurrency>20))throw Error('探索数は1〜20です');
     if(next.eventPollingSeconds!==undefined&&(next.eventPollingSeconds<1||next.eventPollingSeconds>3600))throw Error('間隔は1〜3600秒です');
     s.settings={...s.settings,...next,javaVersion:'1.8.9'};this.log(s,'Mock 設定を変更');});}
-  reset(){this.sequence=100;for(const id of this.tradeGeneration.keys())this.nextGeneration(id);this.snapshot=initial();this.listeners.forEach(fn=>fn());}
+  reset(){this.sequence=100;this.reconnectGeneration++;this.reconnectInFlight.clear();for(const id of this.tradeGeneration.keys())this.nextGeneration(id);this.snapshot=initial();this.listeners.forEach(fn=>fn());}
 }
