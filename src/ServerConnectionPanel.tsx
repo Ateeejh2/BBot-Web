@@ -14,7 +14,7 @@ export function ServerConnectionPanel({snapshot,notify,mode=client.mode}:{snapsh
   try{next=validateServerConnection({host,port,version})}catch{/* Form stays editable. */}
   const connected=snapshot.bots.filter(bot=>isConnectedBot(bot.state)).length;
   const remote=mode==='remote';
-  const remoteActive=remote&&snapshot.bots.some(bot=>bot.state!=='DISCONNECTED');
+  const remoteActive=remote&&snapshot.bots.some(bot=>bot.state!=='DISCONNECTED'||Boolean(bot.startQueued));
   if(remote&&host.includes(':'))next=null;
   const save=async(reconnect:boolean)=>{
     if(!next)return;
