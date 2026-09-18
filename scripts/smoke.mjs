@@ -152,6 +152,9 @@ try {
   assert.match(sessionSource,/id="session-replace-token"[^>]*type="password"[^>]*autoComplete="off"/);
   assert.match(sessionSource,/replaceToken\.current\.value=''/);
   assert.ok(sessionSource.includes('Replace Token'));
+  assert.match(sessionSource,/const botUnavailable=.*startQueued/);
+  assert.match(sessionSource,/disabled=\{busy\|\|botUnavailable\(account\.assignedBot\)\}/);
+  assert.match(sessionSource,/disabled=\{busy\|\|bot\.state!==\'DISCONNECTED\'\|\|Boolean\(bot\.startQueued\)\}/);
   const { RemoteBBotClient } = await server.ssrLoadModule('/src/client/remote.ts');
   const oldWindow=globalThis.window,oldSocket=globalThis.WebSocket,oldFetch=globalThis.fetch;
   const oldLocalStorage=globalThis.localStorage,oldSessionStorage=globalThis.sessionStorage;
