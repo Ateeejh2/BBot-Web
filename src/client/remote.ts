@@ -1,9 +1,9 @@
 import type { BBotClient, BotState, Snapshot, Settings, InstanceStatus, JobStatus, AccountKind, TradeState, TradeClickRequest, PartyCommandResult } from './types';
 import { defaultServerConnection, type ServerConnection, type ReconnectResult } from './serverConnection';
 
-type Wire = { version:number; bots:Array<{id:string;accountLabel:string;state:BotState;instanceId?:string;position?:{x:number;y:number;z:number}}>;
+type Wire = { version:number; bots:Array<{id:string;accountId?:string;accountLabel:string;state:BotState;instanceId?:string;position?:{x:number;y:number;z:number}}>;
   instances:Snapshot['instances'];logs:Array<{id:number;at:number;level:string;message:string;botId?:string;instanceId?:string;kickReason?:string}>;
-  viewer:{botId:string;url:string}|null };
+  viewer:{botId:string;url:string}|null;accounts?:Snapshot['accounts'];serverConnection?:Snapshot['serverConnection'] };
 const unsupported = ():never => {throw Error('この操作は実Botではまだ利用できません')};
 const idleTrade = ():TradeState => ({status:'IDLE',tradeSessionId:null,targetUsername:null,revision:0,window:null});
 export class RemoteBBotClient implements BBotClient {
@@ -13,8 +13,7 @@ export class RemoteBBotClient implements BBotClient {
   private socket?:WebSocket;
   private failures=0;
   private lastRevision=0;
-  private pollTimer?:number;
-  constructor(){void this.refresh();this.open();this.pollTimer=window.setInterval(()=>{if(this.socket?.readyState!==WebSocket.OPEN)void this.refresh()},1000);}
+  constructor(){void this.refresh();this.open();window.setInterval(()=>{if(this.socket?.readyState!==WebSocket.OPEN)void this.refresh()},1000);}
   getSnapshot=()=>this.current;
   subscribe=(listener:()=>void)=>{this.listeners.add(listener);return()=>this.listeners.delete(listener)};
   private connected(value:boolean){if(this.current.remoteConnected===value)return;this.current={...this.current,remoteConnected:value};this.listeners.forEach(listener=>listener())}
@@ -22,9 +21,10 @@ export class RemoteBBotClient implements BBotClient {
     if(data?.version!==1||!Array.isArray(data.bots)||!Array.isArray(data.instances)||!Array.isArray(data.logs))return;
     const kicks=new Map(data.logs.filter(l=>l.kickReason).map(l=>[l.botId,l.kickReason]));
     this.current={...this.current,revision:++this.lastRevision,viewer:data.viewer,instances:data.instances,
-      bots:data.bots.map(b=>({id:b.id,accountId:b.id,name:b.accountLabel,state:b.state,instanceId:b.instanceId,
+      serverConnection:data.serverConnection??this.current.serverConnection,
+      bots:data.bots.map(b=>({id:b.id,accountId:b.accountId??'',name:b.accountLabel,state:b.state,instanceId:b.instanceId,
         x:b.position?.x??0,y:b.position?.y??0,z:b.position?.z??0,updatedAt:Date.now(),kickReason:kicks.get(b.id)})),
-      accounts:data.bots.map(b=>({id:b.id,label:b.accountLabel,kind:'MICROSOFT' as const,status:'READY' as const,createdAt:0})),
+      accounts:data.accounts??[],
       logs:data.logs.map(l=>({id:l.id,at:l.at,level:l.level==='WARN'?'WARN' as const:l.level==='ERROR'?'ERROR' as const:'INFO' as const,
         message:l.kickReason?`${l.message}: ${l.kickReason}`:l.message,botId:l.botId,instanceId:l.instanceId}))};
     this.listeners.forEach(listener=>listener());
@@ -47,7 +47,26 @@ export class RemoteBBotClient implements BBotClient {
   stopBot(id:string){return this.action(id,'disconnect')}
   joinPit(id:string){return this.action(id,'join-pit')}
   getServerConnection=()=>this.current.serverConnection;
-  saveServerConnection(_next:ServerConnection):never{return unsupported()}
+  private async request(path:string,method:'POST'|'PUT',body:object){
+    const r=await fetch(path,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body),credentials:'same-origin'});
+    if(!r.ok){const errors:Record<number,string>={400:'入力を確認してください',404:'対象が見つかりません',409:'Bot稼働中、または競合があります',422:'この認証方式は対応していません'};throw Error(errors[r.status]??'backendで操作に失敗しました')}
+    return r.json() as Promise<unknown>;
+  }
+  async saveServerConnection(next:ServerConnection){
+    const record=await this.request('/api/v1/settings/server','PUT',next) as Snapshot['serverConnection'];
+    this.current={...this.current,serverConnection:record};this.listeners.forEach(listener=>listener());return record;
+  }
+  async addMicrosoftAccount(label:string){
+    await this.request('/api/v1/accounts','POST',{kind:'MICROSOFT',label});await this.refresh();
+  }
+  async retryAccount(accountId:string){
+    if(!/^[0-9a-f-]{36}$/.test(accountId))throw Error('無効なAccount IDです');
+    await this.request(`/api/v1/accounts/${accountId}/actions/retry-auth`,'POST',{});await this.refresh();
+  }
+  async assignAccount(botId:string,accountId:string){
+    if(!/^bot-[1-9]\d*$/.test(botId))throw Error('無効なBot IDです');
+    await this.request(`/api/v1/bots/${botId}/account`,'PUT',{accountId});await this.refresh();
+  }
   reconnectServer(_revision:number):ReconnectResult{return unsupported()}
   getTradeState=(_id:string)=>idleTrade();
   startTrade(_id:string,_username:string):void{unsupported()}

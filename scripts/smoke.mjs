@@ -11,6 +11,7 @@ try {
   const { putServerConnection,postServerReconnect } = await server.ssrLoadModule('/src/server/serverConnection.ts');
   const { App } = await server.ssrLoadModule('/src/App.tsx');
   const { ServerConnectionPanel } = await server.ssrLoadModule('/src/ServerConnectionPanel.tsx');
+  const { RemoteAccountsPanel } = await server.ssrLoadModule('/src/RemoteAccountsPanel.tsx');
   const client = new MockBBotClient();
   let updates=0;const unsubscribe=client.subscribe(()=>updates++);
   client.createBots(20);
@@ -128,6 +129,47 @@ try {
   assert.ok(html.includes('Command center')&&html.includes('Java 1.8.9'));
   const serverHtml=renderToString(createElement(ServerConnectionPanel,{snapshot:configClient.getSnapshot(),notify:()=>{}}));
   assert.ok(serverHtml.includes('Server Connection')&&serverHtml.includes('Minecraft Version')&&serverHtml.includes('Save &amp; Reconnect'));
+  const remoteSnapshot={...configClient.getSnapshot(),bots:[{id:'bot-1',accountId:'account-1',name:'Scout',state:'DISCONNECTED',x:0,y:0,z:0,updatedAt:0}],
+    accounts:[{id:'account-1',label:'Scout',kind:'MICROSOFT',status:'READY',assignedBot:'bot-1',createdAt:0}],
+    serverConnection:{host:'play.example.com',port:25566,version:'1.8.9',revision:2}};
+  const remoteSettings=renderToString(createElement(ServerConnectionPanel,{snapshot:remoteSnapshot,notify:()=>{},mode:'remote'}));
+  assert.ok(remoteSettings.includes('play.example.com')&&remoteSettings.includes('25566')&&remoteSettings.includes('Save'));
+  assert.equal(remoteSettings.includes('Save &amp; Reconnect'),false);
+  const remoteAccounts=renderToString(createElement(RemoteAccountsPanel,{snapshot:remoteSnapshot,notify:()=>{}}));
+  assert.ok(remoteAccounts.includes('Add Microsoft')&&remoteAccounts.includes('Scout')&&remoteAccounts.includes('assignment'));
+  assert.equal(remoteAccounts.includes('SECRET_REFRESH_TOKEN'),false);
+  const { RemoteBBotClient } = await server.ssrLoadModule('/src/client/remote.ts');
+  const oldWindow=globalThis.window,oldSocket=globalThis.WebSocket,oldFetch=globalThis.fetch;
+  const oldLocalStorage=globalThis.localStorage,oldSessionStorage=globalThis.sessionStorage;
+  let browserWrites=0;
+  const requests=[];let wire={version:1,bots:[{id:'bot-1',accountId:'account-1',accountLabel:'Scout',state:'DISCONNECTED'}],
+    instances:[],logs:[],viewer:null,accounts:remoteSnapshot.accounts,serverConnection:remoteSnapshot.serverConnection};
+  try{
+    globalThis.window={location:{href:'http://localhost:5173/'},setInterval:()=>0};
+    globalThis.localStorage={setItem:()=>browserWrites++};globalThis.sessionStorage={setItem:()=>browserWrites++};
+    globalThis.WebSocket=class{static OPEN=1;constructor(){this.readyState=0}};
+    globalThis.fetch=async(path,options={})=>{
+      requests.push({path,options});
+      if(path==='/api/v1/settings/server'){const result={...JSON.parse(options.body),revision:3};wire={...wire,serverConnection:result};return Response.json(result)}
+      if(path==='/api/v1/accounts'&&options.method==='POST'){
+        const account={id:'account-2',label:JSON.parse(options.body).label,kind:'MICROSOFT',status:'WAITING_FOR_LOGIN',createdAt:1};
+        wire={...wire,accounts:[...wire.accounts,account]};return Response.json(account,{status:201});
+      }
+      if(path==='/api/v1/bots/bot-1/account'){wire={...wire,accounts:wire.accounts.map(a=>({...a,assignedBot:a.id==='account-2'?'bot-1':undefined}))};return Response.json(wire.accounts[1])}
+      return Response.json(wire);
+    };
+    const remote=new RemoteBBotClient();await new Promise(resolve=>setTimeout(resolve,0));
+    assert.equal(remote.getServerConnection().host,'play.example.com');
+    assert.equal((await remote.saveServerConnection({host:'next.example',port:25565,version:'1.8.9'})).revision,3);
+    await remote.addMicrosoftAccount('Second');await remote.assignAccount('bot-1','account-2');
+    assert.equal(remote.getSnapshot().accounts[1].assignedBot,'bot-1');
+    assert.equal(requests.some(r=>r.path==='/api/v1/settings/server'&&r.options.method==='PUT'),true);
+    assert.equal(requests.some(r=>r.path==='/api/v1/accounts'&&r.options.method==='POST'),true);
+    assert.equal(JSON.stringify(requests).includes('SECRET_REFRESH_TOKEN'),false);
+    assert.equal(requests.some(r=>r.options?.body&&/token|password|credential/i.test(r.options.body)),false);
+    assert.equal(browserWrites,0);
+  }finally{globalThis.window=oldWindow;globalThis.WebSocket=oldSocket;globalThis.fetch=oldFetch;
+    globalThis.localStorage=oldLocalStorage;globalThis.sessionStorage=oldSessionStorage}
   client.reset();assert.equal(client.getSnapshot().bots.length,6);
   console.log('Mock Trade, Party/Warp, Server Connection validation/reconnect, and server render: OK');
 } finally { await server.close(); }
