@@ -8,6 +8,7 @@ export interface Bot { id:string; accountId:string; name:string; state:BotState;
 export interface Instance { id:string; status:InstanceStatus; firstSeen:number; lastSeen:number; metadata?:string }
 export interface Job { id:string; eventType:string; instanceId:string; state:JobStatus; botId?:string; x:number;y:number;z:number; expiresAt:number }
 export interface Account { id:string; label:string; kind:AccountKind; status:'READY'|'UNASSIGNED'|'WAITING_FOR_LOGIN'|'ERROR'; minecraftName?:string; assignedBot?:string; createdAt:number }
+export interface MicrosoftAuthChallenge { verificationUri:string; userCode:string; expiresAt:number }
 export interface LogEntry { id:number; at:number; level:'INFO'|'WARN'|'ERROR'; message:string; botId?:string; instanceId?:string; jobId?:string }
 export interface Settings { maxBots:number; pathConcurrency:number; eventPollingSeconds:number; debug:boolean; javaVersion:'1.8.9' }
 export type TradeStatus = 'IDLE'|'REQUESTING'|'WAITING_FOR_GUI'|'OPEN'|'CLOSED'|'COMPLETED'|'TIMEOUT'|'ERROR';
@@ -44,7 +45,8 @@ export interface BBotClient {
   addInstance():void;
   setInstanceStatus(id:string,status:InstanceStatus):void;
   addAccount(label:string,kind:AccountKind):void;
-  addMicrosoftAccount?(label:string):Promise<void>;
+  addMicrosoftAccount?(label:string):Promise<Account>;
+  getMicrosoftAuthChallenge?(accountId:string):Promise<MicrosoftAuthChallenge|null>;
   retryAccount?(accountId:string):Promise<void>;
   assignAccount?(botId:string,accountId:string|null):Promise<void>;
   deleteAccount?(accountId:string):Promise<void>;
