@@ -1,4 +1,4 @@
-import type { BBotClient, BotState, Snapshot, Settings, InstanceStatus, JobStatus, AccountKind, TradeState, TradeClickRequest, PartyCommandResult, Account, MicrosoftAuthChallenge, SessionAccountInput } from './types';
+import type { BBotClient, BotState, Snapshot, Settings, InstanceStatus, JobStatus, AccountKind, TradeState, TradeClickRequest, PartyCommandResult, Account, MicrosoftAuthChallenge, SessionAccountInput, FleetActionResult } from './types';
 import { defaultServerConnection, type ServerConnection, type ReconnectResult } from './serverConnection';
 
 type Wire = { version:number; bots:Array<{id:string;accountId?:string;accountLabel:string;minecraftName?:string;state:BotState;instanceId?:string;position?:{x:number;y:number;z:number};kickReason?:string;kickedAt?:number}>;
@@ -21,6 +21,7 @@ export class RemoteBBotClient implements BBotClient {
     if(data?.version!==1||!Array.isArray(data.bots)||!Array.isArray(data.instances)||!Array.isArray(data.logs))return;
     const kicks=new Map(data.logs.filter(l=>l.kickReason).map(l=>[l.botId,l.kickReason]));
     this.current={...this.current,revision:++this.lastRevision,viewer:data.viewer,instances:data.instances,
+      settings:{...this.current.settings,maxBots:data.bots.length},
       serverConnection:data.serverConnection??this.current.serverConnection,
       bots:data.bots.map(b=>({id:b.id,accountId:b.accountId??'',name:b.minecraftName??b.accountLabel,state:b.state,instanceId:b.instanceId,
         x:b.position?.x??0,y:b.position?.y??0,z:b.position?.z??0,updatedAt:Date.now(),kickReason:b.kickReason??kicks.get(b.id),kickedAt:b.kickedAt})),
@@ -65,6 +66,20 @@ export class RemoteBBotClient implements BBotClient {
     return this.action(id,'connect');
   }
   stopBot(id:string){return this.action(id,'disconnect')}
+  async startAssignedBots(){
+    const r=await fetch('/api/v1/fleet/actions/start-assigned',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',credentials:'same-origin'});
+    const data=await r.json().catch(()=>null) as (FleetActionResult|{error?:string}|null);
+    if(!r.ok)throw Error(r.status===409?'設定変更または認証処理中です。少し待って再試行してください':'複数BotのStartに失敗しました');
+    await this.refresh();
+    return data as FleetActionResult;
+  }
+  async stopAllBots(){
+    const r=await fetch('/api/v1/fleet/actions/stop-all',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',credentials:'same-origin'});
+    const data=await r.json().catch(()=>null) as (FleetActionResult|{error?:string}|null);
+    if(!r.ok)throw Error('複数BotのStopに失敗しました');
+    await this.refresh();
+    return data as FleetActionResult;
+  }
   joinPit(id:string){return this.action(id,'join-pit')}
   getServerConnection=()=>this.current.serverConnection;
   private async request(path:string,method:'POST'|'PUT',body:object){
