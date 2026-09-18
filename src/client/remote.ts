@@ -13,7 +13,8 @@ export class RemoteBBotClient implements BBotClient {
   private socket?:WebSocket;
   private failures=0;
   private lastRevision=0;
-  constructor(){void this.refresh();this.open();}
+  private pollTimer?:number;
+  constructor(){void this.refresh();this.open();this.pollTimer=window.setInterval(()=>{if(this.socket?.readyState!==WebSocket.OPEN)void this.refresh()},1000);}
   getSnapshot=()=>this.current;
   subscribe=(listener:()=>void)=>{this.listeners.add(listener);return()=>this.listeners.delete(listener)};
   private connected(value:boolean){if(this.current.remoteConnected===value)return;this.current={...this.current,remoteConnected:value};this.listeners.forEach(listener=>listener())}
@@ -28,13 +29,13 @@ export class RemoteBBotClient implements BBotClient {
         message:l.kickReason?`${l.message}: ${l.kickReason}`:l.message,botId:l.botId,instanceId:l.instanceId}))};
     this.listeners.forEach(listener=>listener());
   }
-  private async refresh(){try{const r=await fetch('/api/v1/status',{headers:{'X-BBot-UI':'1'},credentials:'same-origin',cache:'no-store'});if(r.ok)this.apply(await r.json() as Wire)}catch{/* WebSocket reconnects. */}}
+  private async refresh(){try{const r=await fetch('/api/v1/status',{headers:{'X-BBot-UI':'1'},credentials:'same-origin',cache:'no-store'});if(r.ok){this.apply(await r.json() as Wire);this.connected(true);return true}}catch{/* Keep polling while WebSocket is unavailable. */}return false}
   private open(){
     const url=new URL('/api/v1/events',window.location.href);url.protocol=url.protocol==='https:'?'wss:':'ws:';
     const socket=new WebSocket(url);this.socket=socket;
     socket.onmessage=event=>{try{const packet=JSON.parse(event.data as string) as {type:string;data:Wire};if(packet.type==='snapshot')this.apply(packet.data)}catch{/* Ignore invalid packets. */}};
     socket.onopen=()=>{this.failures=0;this.connected(true)};
-    socket.onclose=()=>{if(this.socket!==socket)return;this.connected(false);setTimeout(()=>{void this.refresh();this.open()},Math.min(1000*2**this.failures++,10000))};
+    socket.onclose=()=>{if(this.socket!==socket)return;void this.refresh().then(ok=>{if(!ok)this.connected(false)});setTimeout(()=>{this.open()},Math.min(1000*2**this.failures++,10000))};
   }
   private async action(id:string,name:'connect'|'join-pit'|'disconnect'){
     if(!/^bot-[1-9]\d*$/.test(id))throw Error('無効なBot IDです');
