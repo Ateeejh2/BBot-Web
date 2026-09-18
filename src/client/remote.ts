@@ -91,6 +91,22 @@ export class RemoteBBotClient implements BBotClient {
     await this.refresh();
     return data as Account;
   }
+  async replaceSessionToken(accountId:string,accessToken:string){
+    if(!/^[0-9a-f-]{36}$/.test(accountId))throw Error('無効なAccount IDです');
+    const r=await fetch(`/api/v1/accounts/${accountId}/session-token`,{method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({accessToken}),credentials:'same-origin'});
+    const data=await r.json().catch(()=>null) as (Account|{error?:string}|null);
+    if(!r.ok){
+      const code=data&&'error'in data?data.error:undefined;
+      if(code==='INVALID_SESSION_TOKEN')throw Error('Minecraft Access Tokenが無効、期限切れ、またはMinecraftプロフィールを取得できません');
+      if(code==='PROFILE_MISMATCH')throw Error('このTokenは別のMinecraft Accountのものです');
+      if(code==='INVALID_STATE')throw Error('使用中のBotをStopしてからTokenを更新してください');
+      if(code==='UNKNOWN_ACCOUNT')throw Error('Session Accountが見つかりません');
+      throw Error(r.status===400?'入力を確認してください':'Session Tokenの更新に失敗しました');
+    }
+    await this.refresh();
+    return data as Account;
+  }
   async getMicrosoftAuthChallenge(accountId:string){
     if(!/^[0-9a-f-]{36}$/.test(accountId))throw Error('無効なAccount IDです');
     const r=await fetch(`/api/v1/accounts/${accountId}/auth-challenge`,{credentials:'same-origin',cache:'no-store'});
