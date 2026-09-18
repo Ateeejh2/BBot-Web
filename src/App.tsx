@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { Activity, ArrowRight, Bot as BotIcon, Check, ChevronDown, ChevronRight, CircleHelp, Database, LayoutDashboard, Layers3, ListChecks, MoreHorizontal, Play, Plus, Power, Radio, RotateCcw, ScrollText, Search, Settings2, ShieldCheck, Users, X } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowRight, Bot as BotIcon, Check, ChevronDown, ChevronRight, CircleHelp, Database, LayoutDashboard, Layers3, ListChecks, MoreHorizontal, Play, Plus, Power, Radio, RotateCcw, ScrollText, Search, Settings2, ShieldCheck, Users, X } from 'lucide-react';
 import { bbotClient as client } from './client';
 import { ServerConnectionPanel } from './ServerConnectionPanel';
 import { LiveViewModal } from './LiveViewModal';
@@ -52,7 +52,10 @@ function BotCard({bot,compact,onAction,trade,onLiveView}:{bot:Bot;compact?:boole
     <div className="bot-main"><div className={`bot-avatar ${tone(bot.state)}`}><BotIcon size={21} strokeWidth={1.8}/></div>
       <div className="bot-identity"><strong>{bot.name}</strong><span className="mono faint">{bot.id} · {bot.instanceId??'No instance'}</span></div>
       <Badge status={bot.state} label={short[bot.state]}/></div>
-    {!compact&&<div className="bot-details"><span>Position <b className="mono">{bot.state!=='DISCONNECTED'?`${bot.x.toFixed(1)} / ${bot.y.toFixed(1)} / ${bot.z.toFixed(1)}`:'—'}</b></span><span>Job <b className="mono">{bot.jobId??'—'}</b></span>{bot.kickReason&&<span>Kick <b>{bot.kickReason}</b></span>}</div>}
+    {bot.kickReason&&<div className={`bot-kick ${compact?'compact-kick':''}`} role={bot.state==='DISCONNECTED'?'alert':'status'}>
+      <AlertTriangle size={15}/><div><strong>Last kick{bot.kickedAt!==undefined?` · ${rel(bot.kickedAt)}`:''}</strong><span>{bot.kickReason}</span></div>
+    </div>}
+    {!compact&&<div className="bot-details"><span>Position <b className="mono">{bot.state!=='DISCONNECTED'?`${bot.x.toFixed(1)} / ${bot.y.toFixed(1)} / ${bot.z.toFixed(1)}`:'—'}</b></span><span>Job <b className="mono">{bot.jobId??'—'}</b></span></div>}
     <div className="card-actions">
       {!active?<button className="mini primary-mini" onClick={()=>onAction(()=>client.startBot(bot.id))}><Play size={15}/> Start</button>:<button className="mini" onClick={()=>onAction(()=>client.stopBot(bot.id))}><Power size={15}/> Stop</button>}
       {client.mode==='mock'&&active&&<button className="mini" onClick={()=>onAction(()=>client.recoverBot(bot.id))}><RotateCcw size={15}/> Recover</button>}
