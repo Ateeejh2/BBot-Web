@@ -63,9 +63,15 @@ export class RemoteBBotClient implements BBotClient {
     if(!/^[0-9a-f-]{36}$/.test(accountId))throw Error('無効なAccount IDです');
     await this.request(`/api/v1/accounts/${accountId}/actions/retry-auth`,'POST',{});await this.refresh();
   }
-  async assignAccount(botId:string,accountId:string){
+  async assignAccount(botId:string,accountId:string|null){
     if(!/^bot-[1-9]\d*$/.test(botId))throw Error('無効なBot IDです');
     await this.request(`/api/v1/bots/${botId}/account`,'PUT',{accountId});await this.refresh();
+  }
+  async deleteAccount(accountId:string){
+    if(!/^[0-9a-f-]{36}$/.test(accountId))throw Error('無効なAccount IDです');
+    const r=await fetch(`/api/v1/accounts/${accountId}`,{method:'DELETE',credentials:'same-origin'});
+    if(!r.ok){const errors:Record<number,string>={404:'Accountが見つかりません',409:'使用中のAccountはStopしてから削除してください'};throw Error(errors[r.status]??'Accountの削除に失敗しました')}
+    await this.refresh();
   }
   reconnectServer(_revision:number):ReconnectResult{return unsupported()}
   getTradeState=(_id:string)=>idleTrade();
