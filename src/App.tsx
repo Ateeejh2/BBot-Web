@@ -86,6 +86,7 @@ function App(){
   const go=(v:Page)=>{setPage(v);setMore(false);setFilter('all');setQuery('');window.scrollTo({top:0,behavior:'smooth'});};
   const perform=(task:()=>void|Promise<void>,success='操作を送信しました')=>{void Promise.resolve().then(task).then(()=>setToast(success)).catch(err=>setToast(err instanceof Error?err.message:'操作に失敗しました'))};
   const active=snapshot.bots.filter(b=>b.state!=='DISCONNECTED').length;
+  const assignedReadyOffline=snapshot.bots.filter(b=>b.state==='DISCONNECTED'&&snapshot.accounts.some(a=>a.assignedBot===b.id&&a.status==='READY')).length;
   const live=snapshot.bots.filter(b=>['IN_PIT_IDLE','PATHFINDING','WORKING'].includes(b.state)).length;
   const pending=snapshot.jobs.filter(j=>['QUEUED','ASSIGNED','RUNNING'].includes(j.state)).length;
   const current=nav.find(n=>n.id===page)!;
@@ -96,8 +97,12 @@ function App(){
     </aside>
     <div className="mobile-top"><div className="mobile-brand"><span className="brand-mark">B<span>.</span></span><b>BBot</b></div><span className="mobile-mode"><span className="mode-dot"/> {client.mode==='remote'?'REMOTE MODE':'MOCK MODE'}</span></div>
     <main className="content" id="main"><div className="desktop-top"><div className="breadcrumb">WORKSPACE <ChevronRight size={14}/> {current.label.toUpperCase()}</div><div className="top-right"><span className="version-pill">JAVA EDITION <b>1.8.9</b></span><span className="mode-pill"><span className="mode-dot"/> {client.mode==='remote'?'REMOTE MODE':'MOCK MODE'}</span></div></div>
-      <div className="page-head"><div><div className="eyebrow">BBOT / {current.label.toUpperCase()}</div><h1>{page==='dashboard'?'Command center':current.label}</h1><p>{({dashboard:client.mode==='remote'?'実Bot backendを操作・監視する管理画面。':'20クライアントまでを見渡す、Mockの管理画面。',bots:'各Botの状態と操作をまとめて確認。',instances:'発見したPit instanceの状態を確認。',jobs:'イベントの割当と進行状況を確認。',accounts:client.mode==='remote'?'Microsoft Accountの追加とBot割当。':'Session Accountの表示と追加を試す。',settings:client.mode==='remote'?'実Minecraft接続先の設定。':'Mock環境の表示設定と動作値。',logs:client.mode==='remote'?'実Botの操作履歴。':'Mock操作の履歴。秘密情報は記録しません。'} as Record<Page,string>)[page]}</p></div>
+      <div className="page-head"><div><div className="eyebrow">BBOT / {current.label.toUpperCase()}</div><h1>{page==='dashboard'?'Command center':current.label}</h1><p>{({dashboard:client.mode==='remote'?'実Bot backendを操作・監視する管理画面。':'20クライアントまでを見渡す、Mockの管理画面。',bots:'各Botの状態と操作をまとめて確認。',instances:'発見したPit instanceの状態を確認。',jobs:'イベントの割当と進行状況を確認。',accounts:client.mode==='remote'?'Microsoft / Session Accountの追加とBot割当。':'Session Accountの表示と追加を試す。',settings:client.mode==='remote'?'実Minecraft接続先の設定。':'Mock環境の表示設定と動作値。',logs:client.mode==='remote'?'実Botの操作履歴。':'Mock操作の履歴。秘密情報は記録しません。'} as Record<Page,string>)[page]}</p></div>
         {page==='bots'&&client.mode==='mock'&&<button className="button accent" disabled={snapshot.bots.length>=20} onClick={()=>perform(()=>{client.updateSettings({maxBots:20});client.createBots(20)},'20 BotのMock状態を生成しました')}><Plus size={17}/> Generate 20 Bots</button>}
+        {page==='bots'&&client.mode==='remote'&&<div className="server-actions">
+          <button className="button accent" disabled={assignedReadyOffline===0} onClick={()=>perform(()=>client.startAssignedBots!(),`割当済み ${assignedReadyOffline} BotのStartを予約しました`)}><Play size={17}/> Start Assigned</button>
+          <button className="button outline" disabled={active===0} onClick={()=>perform(()=>client.stopAllBots!(),'全Botを停止しました')}><Power size={17}/> Stop All</button>
+        </div>}
         {page==='instances'&&client.mode==='mock'&&<button className="button accent" onClick={()=>perform(()=>client.addInstance(),'新しいInstanceを観測しました')}><Plus size={17}/> Add instance</button>}
         {page==='accounts'&&client.mode==='mock'&&<button className="button accent" onClick={()=>setAccountOpen(true)}><Plus size={17}/> Add account</button>}
       </div>
