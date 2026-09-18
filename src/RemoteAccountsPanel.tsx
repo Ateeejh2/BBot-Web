@@ -41,7 +41,7 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
   <div className="list-label">ACCOUNTS <span>{snapshot.accounts.length}</span></div>
   <div className="account-list">{snapshot.accounts.map(account=><div className="account-row" key={account.id}>
     <div className="account-avatar">{account.label.slice(0,1).toUpperCase()}</div>
-    <div><strong>{account.label}</strong><span>Microsoft · {account.status} · {account.assignedBot??'Unassigned'}</span></div>
+    <div><strong>{account.minecraftName??account.label}</strong><span>{account.minecraftName?`${account.label} · `:''}Microsoft · {account.status} · {account.assignedBot??'Unassigned'}</span></div>
     <div className="server-actions">
       {account.status==='ERROR'?<button className="mini" disabled={busy} onClick={()=>void retry(account.id)}>Retry</button>:
         <span className="account-lock">{account.status==='READY'?'Ready':'Pending'}</span>}
