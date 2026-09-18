@@ -156,10 +156,13 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
   <div className="list-label">ACCOUNTS <span>{snapshot.accounts.length}</span></div>
   <div className="account-list">{snapshot.accounts.map(account=><div className="account-row" key={account.id}>
     <div className="account-avatar">{account.label.slice(0,1).toUpperCase()}</div>
-    <div><strong>{account.minecraftName??account.label}</strong><span>{account.minecraftName?`${account.label} · `:''}{account.kind==='SESSION'?'Session':'Microsoft'} · {account.status} · {account.assignedBot??'Unassigned'}</span></div>
+    <div><strong>{account.minecraftName??account.label}</strong><span>{account.minecraftName?`${account.label} · `:''}{account.kind==='SESSION'?'Session':'Microsoft'} · {account.status} · {account.assignedBot??'Unassigned'}</span>
+      {account.kind==='SESSION'&&account.authError==='SESSION_TOKEN_INVALID'&&<span className="server-error">Authentication failed · Replace Token required</span>}
+    </div>
     <div className="server-actions">
       {account.kind==='MICROSOFT'&&account.status==='ERROR'?<button className="mini" disabled={busy} onClick={()=>void retry(account.id)}>Retry</button>:
         account.kind==='MICROSOFT'&&account.status==='WAITING_FOR_LOGIN'?<button className="mini primary-mini" disabled={busy} onClick={()=>void openSignIn(account.id)}>Sign in</button>:
+        account.kind==='SESSION'&&account.status==='ERROR'?<span className="account-lock">Auth error</span>:
         <span className="account-lock">Ready</span>}
       {account.kind==='SESSION'&&<button className="mini" disabled={busy||Boolean(account.assignedBot&&snapshot.bots.find(b=>b.id===account.assignedBot)?.state!=='DISCONNECTED')} onClick={()=>{setError('');setReplaceAccountId(account.id)}}>Replace Token</button>}
       <button className="mini" disabled={busy||Boolean(account.assignedBot&&snapshot.bots.find(b=>b.id===account.assignedBot)?.state!=='DISCONNECTED')} onClick={()=>void remove(account.id,account.label,account.kind)} title={account.assignedBot&&snapshot.bots.find(b=>b.id===account.assignedBot)?.state!=='DISCONNECTED'?'使用中のBotをStopしてから削除してください':'Accountを削除'}>
