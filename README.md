@@ -2,7 +2,7 @@
 
 BBotの管理画面をスマートフォンで確認するための初期版です。Dashboard、Bots、Instances、Jobs、Accounts、Settings、Logsを切り替えられます。**Minecraft Java Edition 1.8.9** を表示します。
 
-現時点ではすべてブラウザ内の一時的なMockデータです。Start / Stop / Recover、Botの8状態への切替、20 Bot生成、Instanceの追加・状態変更、Jobの作成・進行変更、Session Accountの追加を試せます。再読み込みすると初期状態に戻ります。BBot本体への接続やMinecraft操作は発生しません。
+既定はブラウザ内の一時的なMockデータです。Start / Stop / Recover、Botの8状態への切替、20 Bot生成、Instanceの追加・状態変更、Jobの作成・進行変更、Session Accountの追加を試せます。再読み込みすると初期状態に戻ります。MockモードではBBot本体への接続やMinecraft操作は発生しません。REMOTE MODEではBBotのREST APIとWebSocketへ接続します。
 
 ## ローカル起動
 
@@ -13,7 +13,7 @@ npm ci
 npm run dev
 ```
 
-画面はローカルの`http://127.0.0.1:5173/`で開きます。別端末からのローカルアクセスは初期設定で無効です。画面には実アカウントや実tokenを入力しないでください。
+画面はローカルの`http://127.0.0.1:5173/`で開きます。別端末からのローカルアクセスは初期設定で無効です。Mockモードには実アカウントや実tokenを入力しないでください。REMOTE MODEのSessionフォームは、利用者が管理するCodespacesのWeb画面からbackendへ一度だけcredentialを送信します。認証済みのアクセス経路でのみ利用してください。
 
 ```bash
 npm test
@@ -48,8 +48,8 @@ Wranglerが出力するPreview URLをスマホで開いてください。branch�
 
 ## 設計・安全上の境界
 
-`src/client/types.ts`の`BBotClient`がUIとデータ源の契約です。`src/client/mock.ts`の`MockBBotClient`が現在の実装で、`src/client/index.ts`だけがUIへclientを渡します。将来はREST API + WebSocketを使うRemote実装へ差し替えます。`src/client/remote.ts`はその拡張点を記述し、まだ通信コードは含みません。
+`src/client/types.ts`の`BBotClient`がUIとデータ源の契約です。`VITE_BBOT_MODE=remote`で実backendへ接続し、指定がない場合はMockモードです。REMOTE MODEのAccountsではMicrosoftの認証とSession credentialの登録、割当、削除ができます。Session credentialはbackendの`.auth/session/<account-id>.json`にのみ保存され、公開APIには含まれません。`READY`は入力形式が有効であることを示し、Minecraftサーバーへの認証成功はStart後に確認してください。
 
-Accountsの「Session Account」は画面設計のMockです。実tokenを入力する欄、認証処理、`localStorage`・`sessionStorage`・IndexedDBへのtoken保存はありません。MockのAccountラベルやLogsに秘密情報を入れないでください。UIには最大20 Botと動的Instanceを想定した状態があり、Minecraft側の接続や実動作の保証は含みません。
+Codespacesでは両リポジトリを更新後、BBotで`npm run setup:web-control && npm run build && npm start`、別ターミナルでBBot-Webから`VITE_BBOT_MODE=remote npm run dev -- --host 0.0.0.0`を実行します。初回のみそれぞれ`npm ci`が必要です。
 
 スマホでは下部ナビゲーション、PCではサイドバーを使います。BotsとJobsは横スクロール表にせずカードで表示し、狭い幅では1列になります。Preview上で再読み込みするとMock操作はリセットされます。
