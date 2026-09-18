@@ -48,6 +48,7 @@ export interface BBotClient {
   addAccount(label:string,kind:AccountKind):void;
   addMicrosoftAccount?(label:string):Promise<Account>;
   addSessionAccount?(input:SessionAccountInput):Promise<Account>;
+  replaceSessionToken?(accountId:string,accessToken:string):Promise<Account>;
   getMicrosoftAuthChallenge?(accountId:string):Promise<MicrosoftAuthChallenge|null>;
   retryAccount?(accountId:string):Promise<void>;
   assignAccount?(botId:string,accountId:string|null):Promise<void>;
