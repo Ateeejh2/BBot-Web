@@ -46,7 +46,8 @@ export interface BBotClient {
   addAccount(label:string,kind:AccountKind):void;
   addMicrosoftAccount?(label:string):Promise<void>;
   retryAccount?(accountId:string):Promise<void>;
-  assignAccount?(botId:string,accountId:string):Promise<void>;
+  assignAccount?(botId:string,accountId:string|null):Promise<void>;
+  deleteAccount?(accountId:string):Promise<void>;
   createJob(instanceId:string):void;
   setJobState(id:string,state:JobStatus):void;
   updateSettings(next:Partial<Settings>):void;
