@@ -43,7 +43,9 @@ export class RemoteBBotClient implements BBotClient {
     const data=await r.json().catch(()=>null) as (Wire|{error?:string}|null);
     if(!r.ok){
       const code=data&&'error'in data?data.error:undefined;
+      if(code==='SESSION_AUTH_REQUIRED')await this.refresh();
       const message=code==='ACCOUNT_REQUIRED'?'AccountがBotに割り当てられていません':
+        code==='SESSION_AUTH_REQUIRED'?'Session Tokenが無効または期限切れです。AccountsからReplace Tokenしてください':
         code==='INVALID_STATE'?'現在のBot stateでは操作できません':
         code==='CONFLICT'?'設定変更または認証処理中です。少し待って再試行してください':
         r.status===404?'Botが見つかりません':'操作に失敗しました';
