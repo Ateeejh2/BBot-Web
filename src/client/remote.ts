@@ -1,7 +1,7 @@
 import type { BBotClient, BotState, Snapshot, Settings, InstanceStatus, JobStatus, AccountKind, TradeState, TradeClickRequest, PartyCommandResult, Account, MicrosoftAuthChallenge, SessionAccountInput, FleetActionResult } from './types';
 import { defaultServerConnection, type ServerConnection, type ReconnectResult } from './serverConnection';
 
-type Wire = { version:number; bots:Array<{id:string;accountId?:string;accountLabel:string;minecraftName?:string;state:BotState;instanceId?:string;position?:{x:number;y:number;z:number};kickReason?:string;kickedAt?:number}>;
+type Wire = { version:number; bots:Array<{id:string;accountId?:string;accountLabel:string;minecraftName?:string;state:BotState;startQueued?:boolean;instanceId?:string;position?:{x:number;y:number;z:number};kickReason?:string;kickedAt?:number}>;
   instances:Snapshot['instances'];logs:Array<{id:number;at:number;level:string;message:string;botId?:string;instanceId?:string;kickReason?:string}>;
   viewer:{botId:string;url:string}|null;accounts?:Snapshot['accounts'];serverConnection?:Snapshot['serverConnection'] };
 const unsupported = ():never => {throw Error('この操作は実Botではまだ利用できません')};
@@ -23,7 +23,7 @@ export class RemoteBBotClient implements BBotClient {
     this.current={...this.current,revision:++this.lastRevision,viewer:data.viewer,instances:data.instances,
       settings:{...this.current.settings,maxBots:data.bots.length},
       serverConnection:data.serverConnection??this.current.serverConnection,
-      bots:data.bots.map(b=>({id:b.id,accountId:b.accountId??'',name:b.minecraftName??b.accountLabel,state:b.state,instanceId:b.instanceId,
+      bots:data.bots.map(b=>({id:b.id,accountId:b.accountId??'',name:b.minecraftName??b.accountLabel,state:b.state,startQueued:b.startQueued,instanceId:b.instanceId,
         x:b.position?.x??0,y:b.position?.y??0,z:b.position?.z??0,updatedAt:Date.now(),kickReason:b.kickReason??kicks.get(b.id),kickedAt:b.kickedAt})),
       accounts:data.accounts??[],
       logs:data.logs.map(l=>({id:l.id,at:l.at,level:l.level==='WARN'?'WARN' as const:l.level==='ERROR'?'ERROR' as const:'INFO' as const,
