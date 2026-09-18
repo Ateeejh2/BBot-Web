@@ -167,6 +167,8 @@ try {
     globalThis.fetch=async(path,options={})=>{
       requests.push({path,options});
       if(path==='/api/v1/settings/server'){const result={...JSON.parse(options.body),revision:3};wire={...wire,serverConnection:result};return Response.json(result)}
+      if(path==='/api/v1/fleet/actions/start-assigned'&&options.method==='POST')return Response.json({started:['bot-1'],skipped:[]})
+      if(path==='/api/v1/fleet/actions/stop-all'&&options.method==='POST')return Response.json({stopped:['bot-1']})
       if(path==='/api/v1/bots/bot-1/actions/connect'&&options.method==='POST'&&failNextStart){
         failNextStart=false;
         wire={...wire,accounts:wire.accounts.map(a=>a.id===sessionAccountId?{...a,status:'ERROR',authError:'SESSION_TOKEN_INVALID'}:a)};
@@ -191,6 +193,8 @@ try {
     const remote=new RemoteBBotClient();await new Promise(resolve=>setTimeout(resolve,0));
     assert.equal(remote.getServerConnection().host,'play.example.com');
     assert.equal((await remote.saveServerConnection({host:'next.example',port:25565,version:'1.8.9'})).revision,3);
+    assert.deepEqual((await remote.startAssignedBots()).started,['bot-1']);
+    assert.deepEqual((await remote.stopAllBots()).stopped,['bot-1']);
     await remote.addMicrosoftAccount('Second');await remote.assignAccount('bot-1','account-2');
     const submitted=await remote.addSessionAccount({label:'Session',accessToken:'TEST_ACCESS'});
     assert.equal(submitted.kind,'SESSION');
@@ -207,6 +211,8 @@ try {
     assert.equal(remote.getSnapshot().accounts.find(a=>a.id===sessionAccountId)?.assignedBot,'bot-1');
     assert.equal(requests.some(r=>r.path==='/api/v1/settings/server'&&r.options.method==='PUT'),true);
     assert.equal(requests.some(r=>r.path==='/api/v1/accounts'&&r.options.method==='POST'),true);
+    assert.equal(requests.some(r=>r.path==='/api/v1/fleet/actions/start-assigned'&&r.options.method==='POST'),true);
+    assert.equal(requests.some(r=>r.path==='/api/v1/fleet/actions/stop-all'&&r.options.method==='POST'),true);
     assert.equal(JSON.stringify(requests).includes('SECRET_REFRESH_TOKEN'),false);
     assert.equal(requests.filter(r=>r.options?.body&&/accessToken/.test(r.options.body)).length,2);
     assert.equal(requests.some(r=>r.path===`/api/v1/accounts/${sessionAccountId}/session-token`&&r.options.method==='PUT'),true);
