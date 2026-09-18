@@ -9,7 +9,7 @@ export interface Instance { id:string; status:InstanceStatus; firstSeen:number; 
 export interface Job { id:string; eventType:string; instanceId:string; state:JobStatus; botId?:string; x:number;y:number;z:number; expiresAt:number }
 export interface Account { id:string; label:string; kind:AccountKind; status:'READY'|'UNASSIGNED'|'WAITING_FOR_LOGIN'|'ERROR'; minecraftName?:string; assignedBot?:string; createdAt:number }
 export interface MicrosoftAuthChallenge { verificationUri:string; userCode:string; expiresAt:number }
-export interface SessionAccountInput { label:string; profileName:string; profileId:string; accessToken:string; clientToken:string }
+export interface SessionAccountInput { label:string; accessToken:string }
 export interface LogEntry { id:number; at:number; level:'INFO'|'WARN'|'ERROR'; message:string; botId?:string; instanceId?:string; jobId?:string }
 export interface Settings { maxBots:number; pathConcurrency:number; eventPollingSeconds:number; debug:boolean; javaVersion:'1.8.9' }
 export type TradeStatus = 'IDLE'|'REQUESTING'|'WAITING_FOR_GUI'|'OPEN'|'CLOSED'|'COMPLETED'|'TIMEOUT'|'ERROR';
