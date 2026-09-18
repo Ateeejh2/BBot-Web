@@ -15,12 +15,14 @@ function resolveViewerUrl(template:string, botId:string):string|null {
   }catch{return null}
 }
 
-export function LiveViewModal({bot,onClose}:{bot:Bot;onClose:()=>void}){
+export function LiveViewModal({bot,onClose,remoteViewer}:{bot:Bot;onClose:()=>void;remoteViewer?:{botId:string;url:string}|null}){
   const configured=(import.meta.env.VITE_BBOT_VIEWER_URL as string|undefined)?.trim()??'';
-  const [draft,setDraft]=useState(()=>localStorage.getItem(storageKey)??configured);
-  const [template,setTemplate]=useState(()=>localStorage.getItem(storageKey)??configured);
+  const [draft,setDraft]=useState(()=>remoteViewer!==undefined?'':localStorage.getItem(storageKey)??configured);
+  const [template,setTemplate]=useState(()=>remoteViewer!==undefined?'':localStorage.getItem(storageKey)??configured);
   const [reload,setReload]=useState(0);
-  const viewerUrl=useMemo(()=>resolveViewerUrl(template,bot.id),[template,bot.id]);
+  const viewerUrl=useMemo(()=>remoteViewer!==undefined
+    ? remoteViewer?.botId===bot.id?resolveViewerUrl(remoteViewer.url,bot.id):null
+    : resolveViewerUrl(template,bot.id),[template,bot.id,remoteViewer]);
 
   useEffect(()=>{
     const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')onClose()};
@@ -46,11 +48,11 @@ export function LiveViewModal({bot,onClose}:{bot:Bot;onClose:()=>void}){
         <div className="live-view-status"><Radio size={16}/><span>{bot.state==='DISCONNECTED'?'Bot offline':'Bot connected'}</span><b className="mono">{bot.x.toFixed(1)} / {bot.y.toFixed(1)} / {bot.z.toFixed(1)}</b></div>
         <button className="mini" disabled={!viewerUrl} onClick={()=>setReload(value=>value+1)}><RefreshCw size={14}/> Reload</button>
       </div>
-      <div className="viewer-url-row">
+      {remoteViewer===undefined&&<div className="viewer-url-row">
         <label htmlFor="viewer-url">Viewer URL</label>
         <div><input id="viewer-url" value={draft} onChange={event=>setDraft(event.target.value)} placeholder="https://viewer.example.com or .../{botId}/" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false}/><button className="button outline" onClick={apply}>Load</button></div>
         <small>URLはこのブラウザだけに保存します。複数Bot構成では <code>{'{botId}'}</code> をURLテンプレートに使えます。HTTPSのBBot-WebではViewer側もHTTPSが必要です。</small>
-      </div>
+      </div>}
       <div className="viewer-frame-wrap">
         {viewerUrl?<iframe key={`${bot.id}:${reload}:${viewerUrl}`} className="viewer-frame" src={viewerUrl} title={`${bot.name} Minecraft Live View`} sandbox="allow-scripts allow-same-origin allow-pointer-lock" allow="fullscreen; gamepad" referrerPolicy="no-referrer"/>:
           <div className="viewer-empty"><Radio size={32}/><strong>Viewer URLを設定してください</strong><p>BBot backendのprismarine-viewer公開URLを入力すると、ここにBotの3D視点が表示されます。</p></div>}

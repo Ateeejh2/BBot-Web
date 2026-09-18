@@ -4,7 +4,7 @@ export type BotState = typeof botStates[number];
 export type InstanceStatus = 'ACTIVE' | 'SUSPECT' | 'INACTIVE';
 export type JobStatus = 'QUEUED' | 'ASSIGNED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
 export type AccountKind = 'SESSION' | 'MICROSOFT';
-export interface Bot { id:string; accountId:string; name:string; state:BotState; instanceId?:string; x:number;y:number;z:number; jobId?:string; updatedAt:number }
+export interface Bot { id:string; accountId:string; name:string; state:BotState; instanceId?:string; x:number;y:number;z:number; jobId?:string; updatedAt:number; kickReason?:string }
 export interface Instance { id:string; status:InstanceStatus; firstSeen:number; lastSeen:number; metadata?:string }
 export interface Job { id:string; eventType:string; instanceId:string; state:JobStatus; botId?:string; x:number;y:number;z:number; expiresAt:number }
 export interface Account { id:string; label:string; kind:AccountKind; status:'READY'|'UNASSIGNED'; createdAt:number }
@@ -19,7 +19,7 @@ export const validMinecraftUsername = (value:string):boolean => /^[A-Za-z0-9_]{1
 export const canSendMinecraftCommand = (state:BotState):boolean => ['LOBBY','IN_PIT_IDLE','PATHFINDING','WORKING'].includes(state);
 export const isConnectedBot = (state:BotState):boolean => ['LOBBY','JOINING_PIT','IN_PIT_IDLE','PATHFINDING','WORKING'].includes(state);
 export interface PartyCommandResult { status:'SENT'|'REJECTED'; message:string; serverMessage?:string }
-export interface Snapshot { bots:Bot[]; instances:Instance[]; jobs:Job[]; accounts:Account[]; logs:LogEntry[]; settings:Settings; serverConnection:ServerConnectionRecord; trades:Record<string,TradeState>; revision:number }
+export interface Snapshot { bots:Bot[]; instances:Instance[]; jobs:Job[]; accounts:Account[]; logs:LogEntry[]; settings:Settings; serverConnection:ServerConnectionRecord; trades:Record<string,TradeState>; revision:number; viewer?:{botId:string;url:string}|null }
 export interface BBotClient {
   readonly mode:'mock'|'remote';
   getSnapshot():Snapshot;
@@ -35,8 +35,9 @@ export interface BBotClient {
   simulateTradeTimeout(botId:string):void;
   inviteParty(botId:string,targetUsername:string):PartyCommandResult|Promise<PartyCommandResult>;
   warpParty(botId:string):PartyCommandResult|Promise<PartyCommandResult>;
-  startBot(id:string):void;
-  stopBot(id:string):void;
+  startBot(id:string):void|Promise<void>;
+  stopBot(id:string):void|Promise<void>;
+  joinPit?(id:string):void|Promise<void>;
   recoverBot(id:string):void;
   setBotState(id:string,state:BotState):void;
   createBots(count:number):void;
