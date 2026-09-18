@@ -9,7 +9,8 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
   const [label,setLabel]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [challenge,setChallenge]=useState<MicrosoftAuthChallenge|null>(null);
   const [kind,setKind]=useState<'MICROSOFT'|'SESSION'>('MICROSOFT');
-  const accessToken=useRef<HTMLInputElement>(null);
+  const [replaceAccountId,setReplaceAccountId]=useState<string|null>(null);
+  const accessToken=useRef<HTMLInputElement>(null),replaceToken=useRef<HTMLInputElement>(null);
 
   const waitForChallenge=async(accountId:string)=>{
     for(let i=0;i<40;i++){
@@ -91,6 +92,20 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
     }finally{setBusy(false)}
   };
 
+  const replaceSessionToken=async()=>{
+    if(!replaceAccountId)return;
+    const token=replaceToken.current?.value??'';
+    if(replaceToken.current)replaceToken.current.value='';
+    if(!token){setError('Minecraft Access Tokenを入力してください');return}
+    setBusy(true);setError('');
+    try{
+      const account=await client.replaceSessionToken!(replaceAccountId,token);
+      setReplaceAccountId(null);
+      notify(`${account.minecraftName??account.label} のSession Tokenを更新しました`);
+    }catch(e){setError(e instanceof Error?e.message:'Session Tokenの更新に失敗しました')}
+    finally{setBusy(false)}
+  };
+
   const assign=async(botId:string,accountId:string|null)=>{
     setBusy(true);setError('');
     try {await client.assignAccount!(botId,accountId);notify(accountId?`${botId} にAccountを割り当てました`:`${botId} のAccount割当を解除しました`)}
@@ -146,11 +161,18 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
       {account.kind==='MICROSOFT'&&account.status==='ERROR'?<button className="mini" disabled={busy} onClick={()=>void retry(account.id)}>Retry</button>:
         account.kind==='MICROSOFT'&&account.status==='WAITING_FOR_LOGIN'?<button className="mini primary-mini" disabled={busy} onClick={()=>void openSignIn(account.id)}>Sign in</button>:
         <span className="account-lock">Ready</span>}
+      {account.kind==='SESSION'&&<button className="mini" disabled={busy||Boolean(account.assignedBot&&snapshot.bots.find(b=>b.id===account.assignedBot)?.state!=='DISCONNECTED')} onClick={()=>{setError('');setReplaceAccountId(account.id)}}>Replace Token</button>}
       <button className="mini" disabled={busy||Boolean(account.assignedBot&&snapshot.bots.find(b=>b.id===account.assignedBot)?.state!=='DISCONNECTED')} onClick={()=>void remove(account.id,account.label,account.kind)} title={account.assignedBot&&snapshot.bots.find(b=>b.id===account.assignedBot)?.state!=='DISCONNECTED'?'使用中のBotをStopしてから削除してください':'Accountを削除'}>
         <Trash2 size={14}/> Delete
       </button>
     </div>
   </div>)}</div>
+  {replaceAccountId&&<div className="panel"><h2>Replace Session Token</h2>
+    <p className="muted">同じMinecraft Accountの新しいAccess Tokenを入力してください。Botが稼働中の場合は先にStopしてください。Tokenは送信後すぐフォームから消えます。</p>
+    <label className="field-label" htmlFor="session-replace-token">Minecraft Access Token</label>
+    <input id="session-replace-token" ref={replaceToken} type="password" autoComplete="off" maxLength={2048}/>
+    <div className="server-actions"><button className="button accent" disabled={busy} onClick={()=>void replaceSessionToken()}>Update Token</button><button className="button outline" disabled={busy} onClick={()=>{if(replaceToken.current)replaceToken.current.value='';setReplaceAccountId(null)}}>Cancel</button></div>
+  </div>}
   {snapshot.bots.map(bot=><div className="panel" key={bot.id}><h2>{bot.id} Account assignment</h2>
     <p className="muted">{bot.state==='DISCONNECTED'?'停止中にAccountを選択できます。':`現在 ${bot.state}。Stop後に変更できます。`}</p>
     <label className="field-label" htmlFor={`assign-${bot.id}`}>Assigned Account</label>
