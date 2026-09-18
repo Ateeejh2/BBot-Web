@@ -145,10 +145,14 @@ try {
   assert.equal(sessionSource.includes('session-profile-name'),false);
   assert.equal(sessionSource.includes('session-profile-id'),false);
   assert.match(sessionSource,/accessToken\.current\.value=''/);
+  assert.match(sessionSource,/id="session-replace-token"[^>]*type="password"[^>]*autoComplete="off"/);
+  assert.match(sessionSource,/replaceToken\.current\.value=''/);
+  assert.ok(sessionSource.includes('Replace Token'));
   const { RemoteBBotClient } = await server.ssrLoadModule('/src/client/remote.ts');
   const oldWindow=globalThis.window,oldSocket=globalThis.WebSocket,oldFetch=globalThis.fetch;
   const oldLocalStorage=globalThis.localStorage,oldSessionStorage=globalThis.sessionStorage;
   let browserWrites=0;
+  const sessionAccountId='33333333-3333-4333-8333-333333333333';
   const requests=[];let wire={version:1,bots:[{id:'bot-1',accountId:'account-1',accountLabel:'Scout',state:'DISCONNECTED'}],
     instances:[],logs:[],viewer:null,accounts:remoteSnapshot.accounts,serverConnection:remoteSnapshot.serverConnection};
   try{
@@ -160,9 +164,16 @@ try {
       if(path==='/api/v1/settings/server'){const result={...JSON.parse(options.body),revision:3};wire={...wire,serverConnection:result};return Response.json(result)}
       if(path==='/api/v1/accounts'&&options.method==='POST'){
         const submitted=JSON.parse(options.body);
-        const account={id:submitted.kind==='SESSION'?'account-3':'account-2',label:submitted.label,kind:submitted.kind,
+        const account={id:submitted.kind==='SESSION'?sessionAccountId:'account-2',label:submitted.label,kind:submitted.kind,
           status:submitted.kind==='SESSION'?'READY':'WAITING_FOR_LOGIN',createdAt:1};
         wire={...wire,accounts:[...wire.accounts,account]};return Response.json(account,{status:201});
+      }
+      if(path===`/api/v1/accounts/${sessionAccountId}/session-token`&&options.method==='PUT'){
+        const body=JSON.parse(options.body);
+        const account=wire.accounts.find(a=>a.id===sessionAccountId);
+        const updated={...account,minecraftName:'SessionRenamed'};
+        wire={...wire,accounts:wire.accounts.map(a=>a.id===sessionAccountId?updated:a)};
+        return Response.json(updated);
       }
       if(path==='/api/v1/bots/bot-1/account'){wire={...wire,accounts:wire.accounts.map(a=>({...a,assignedBot:a.id==='account-2'?'bot-1':undefined}))};return Response.json(wire.accounts[1])}
       return Response.json(wire);
@@ -173,12 +184,16 @@ try {
     await remote.addMicrosoftAccount('Second');await remote.assignAccount('bot-1','account-2');
     const submitted=await remote.addSessionAccount({label:'Session',accessToken:'TEST_ACCESS'});
     assert.equal(submitted.kind,'SESSION');
+    const replaced=await remote.replaceSessionToken(submitted.id,'TEST_ACCESS_REPLACED');
+    assert.equal(replaced.minecraftName,'SessionRenamed');
     assert.equal(JSON.stringify(remote.getSnapshot()).includes('TEST_ACCESS'),false);
+    assert.equal(JSON.stringify(remote.getSnapshot()).includes('TEST_ACCESS_REPLACED'),false);
     assert.equal(remote.getSnapshot().accounts[1].assignedBot,'bot-1');
     assert.equal(requests.some(r=>r.path==='/api/v1/settings/server'&&r.options.method==='PUT'),true);
     assert.equal(requests.some(r=>r.path==='/api/v1/accounts'&&r.options.method==='POST'),true);
     assert.equal(JSON.stringify(requests).includes('SECRET_REFRESH_TOKEN'),false);
-    assert.equal(requests.filter(r=>r.options?.body&&/accessToken/.test(r.options.body)).length,1);
+    assert.equal(requests.filter(r=>r.options?.body&&/accessToken/.test(r.options.body)).length,2);
+    assert.equal(requests.some(r=>r.path===`/api/v1/accounts/${sessionAccountId}/session-token`&&r.options.method==='PUT'),true);
     assert.equal(JSON.stringify(requests).includes('clientToken'),false);
     assert.equal(JSON.stringify(requests).includes('profileId'),false);
     assert.equal(browserWrites,0);
