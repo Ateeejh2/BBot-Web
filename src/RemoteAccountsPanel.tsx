@@ -11,6 +11,7 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
   const [kind,setKind]=useState<'MICROSOFT'|'SESSION'>('MICROSOFT');
   const [replaceAccountId,setReplaceAccountId]=useState<string|null>(null);
   const accessToken=useRef<HTMLInputElement>(null),replaceToken=useRef<HTMLInputElement>(null);
+  const botUnavailable=(botId?:string)=>Boolean(botId&&snapshot.bots.some(bot=>bot.id===botId&&(bot.state!=='DISCONNECTED'||Boolean(bot.startQueued))));
 
   const waitForChallenge=async(accountId:string)=>{
     for(let i=0;i<40;i++){
@@ -164,8 +165,8 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
         account.kind==='MICROSOFT'&&account.status==='WAITING_FOR_LOGIN'?<button className="mini primary-mini" disabled={busy} onClick={()=>void openSignIn(account.id)}>Sign in</button>:
         account.kind==='SESSION'&&account.status==='ERROR'?<span className="account-lock">Auth error</span>:
         <span className="account-lock">Ready</span>}
-      {account.kind==='SESSION'&&<button className="mini" disabled={busy||Boolean(account.assignedBot&&snapshot.bots.find(b=>b.id===account.assignedBot)?.state!=='DISCONNECTED')} onClick={()=>{setError('');setReplaceAccountId(account.id)}}>Replace Token</button>}
-      <button className="mini" disabled={busy||Boolean(account.assignedBot&&snapshot.bots.find(b=>b.id===account.assignedBot)?.state!=='DISCONNECTED')} onClick={()=>void remove(account.id,account.label,account.kind)} title={account.assignedBot&&snapshot.bots.find(b=>b.id===account.assignedBot)?.state!=='DISCONNECTED'?'使用中のBotをStopしてから削除してください':'Accountを削除'}>
+      {account.kind==='SESSION'&&<button className="mini" disabled={busy||botUnavailable(account.assignedBot)} onClick={()=>{setError('');setReplaceAccountId(account.id)}}>Replace Token</button>}
+      <button className="mini" disabled={busy||botUnavailable(account.assignedBot)} onClick={()=>void remove(account.id,account.label,account.kind)} title={botUnavailable(account.assignedBot)?'使用中またはStart待ちのBotをStopしてから削除してください':'Accountを削除'}>
         <Trash2 size={14}/> Delete
       </button>
     </div>
@@ -177,9 +178,9 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
     <div className="server-actions"><button className="button accent" disabled={busy} onClick={()=>void replaceSessionToken()}>Update Token</button><button className="button outline" disabled={busy} onClick={()=>{if(replaceToken.current)replaceToken.current.value='';setReplaceAccountId(null)}}>Cancel</button></div>
   </div>}
   {snapshot.bots.map(bot=><div className="panel" key={bot.id}><h2>{bot.id} Account assignment</h2>
-    <p className="muted">{bot.state==='DISCONNECTED'?'停止中にAccountを選択できます。':`現在 ${bot.state}。Stop後に変更できます。`}</p>
+    <p className="muted">{bot.startQueued?'Start待ちです。StopでQueueをキャンセルしてからAccountを変更できます。':bot.state==='DISCONNECTED'?'停止中にAccountを選択できます。':`現在 ${bot.state}。Stop後に変更できます。`}</p>
     <label className="field-label" htmlFor={`assign-${bot.id}`}>Assigned Account</label>
-    <select id={`assign-${bot.id}`} value={bot.accountId} disabled={busy||bot.state!=='DISCONNECTED'} onChange={e=>void assign(bot.id,e.target.value||null)}>
+    <select id={`assign-${bot.id}`} value={bot.accountId} disabled={busy||bot.state!=='DISCONNECTED'||Boolean(bot.startQueued)} onChange={e=>void assign(bot.id,e.target.value||null)}>
       <option value="">Unassigned</option>
       {snapshot.accounts.filter(a=>a.status==='READY'&&(a.assignedBot===undefined||a.assignedBot===bot.id)).map(a=><option key={a.id} value={a.id}>{a.minecraftName??a.label}</option>)}
     </select>
