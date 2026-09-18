@@ -8,7 +8,7 @@ const unsupported = ():never => {throw Error('この操作は実Botではまだ�
 const idleTrade = ():TradeState => ({status:'IDLE',tradeSessionId:null,targetUsername:null,revision:0,window:null});
 export class RemoteBBotClient implements BBotClient {
   readonly mode='remote' as const;
-  private current:Snapshot={bots:[],instances:[],jobs:[],accounts:[],logs:[],settings:{maxBots:1,pathConcurrency:2,eventPollingSeconds:10,debug:false,javaVersion:'1.8.9'},serverConnection:defaultServerConnection,trades:{},revision:0,viewer:null};
+  private current:Snapshot={bots:[],instances:[],jobs:[],accounts:[],logs:[],settings:{maxBots:1,pathConcurrency:2,eventPollingSeconds:10,debug:false,javaVersion:'1.8.9'},serverConnection:defaultServerConnection,trades:{},revision:0,viewer:null,remoteConnected:false};
   private listeners=new Set<()=>void>();
   private socket?:WebSocket;
   private failures=0;
@@ -16,6 +16,7 @@ export class RemoteBBotClient implements BBotClient {
   constructor(){void this.refresh();this.open();}
   getSnapshot=()=>this.current;
   subscribe=(listener:()=>void)=>{this.listeners.add(listener);return()=>this.listeners.delete(listener)};
+  private connected(value:boolean){if(this.current.remoteConnected===value)return;this.current={...this.current,remoteConnected:value};this.listeners.forEach(listener=>listener())}
   private apply(data:Wire){
     if(data?.version!==1||!Array.isArray(data.bots)||!Array.isArray(data.instances)||!Array.isArray(data.logs))return;
     const kicks=new Map(data.logs.filter(l=>l.kickReason).map(l=>[l.botId,l.kickReason]));
@@ -32,8 +33,8 @@ export class RemoteBBotClient implements BBotClient {
     const url=new URL('/api/v1/events',window.location.href);url.protocol=url.protocol==='https:'?'wss:':'ws:';
     const socket=new WebSocket(url);this.socket=socket;
     socket.onmessage=event=>{try{const packet=JSON.parse(event.data as string) as {type:string;data:Wire};if(packet.type==='snapshot')this.apply(packet.data)}catch{/* Ignore invalid packets. */}};
-    socket.onopen=()=>{this.failures=0};
-    socket.onclose=()=>{if(this.socket!==socket)return;setTimeout(()=>{void this.refresh();this.open()},Math.min(1000*2**this.failures++,10000))};
+    socket.onopen=()=>{this.failures=0;this.connected(true)};
+    socket.onclose=()=>{if(this.socket!==socket)return;this.connected(false);setTimeout(()=>{void this.refresh();this.open()},Math.min(1000*2**this.failures++,10000))};
   }
   private async action(id:string,name:'connect'|'join-pit'|'disconnect'){
     if(!/^bot-[1-9]\d*$/.test(id))throw Error('無効なBot IDです');

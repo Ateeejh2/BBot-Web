@@ -89,7 +89,7 @@ function App(){
   return <div className="app-shell">
     <aside className="sidebar"><div className="brand"><span className="brand-mark">B<span>.</span></span><div><strong>BBot</strong><small>CONTROL ROOM</small></div></div>
       <div className="sidebar-label">WORKSPACE</div><nav className="side-nav" aria-label="メインナビゲーション">{nav.map(n=><NavButton key={n.id} {...n} page={page} setPage={go}/>)}</nav>
-      <div className="sidebar-bottom"><div className="connector"><span className="signal-ring"><Radio size={16}/></span><div><b>{client.mode==='remote'?'Remote BBot':'Mock environment'}</b><small>{client.mode==='remote'?'実Botを操作中':'BBot本体には未接続'}</small></div></div><div className="build-meta">BBOT CONSOLE <span>v0.1 · JAVA 1.8.9</span></div></div>
+      <div className="sidebar-bottom"><div className="connector"><span className="signal-ring"><Radio size={16}/></span><div><b>{client.mode==='remote'?'Remote BBot':'Mock environment'}</b><small>{client.mode==='remote'?(snapshot.remoteConnected?'実Botと同期中':'backendとの接続待ち'):'BBot本体には未接続'}</small></div></div><div className="build-meta">BBOT CONSOLE <span>v0.1 · JAVA 1.8.9</span></div></div>
     </aside>
     <div className="mobile-top"><div className="mobile-brand"><span className="brand-mark">B<span>.</span></span><b>BBot</b></div><span className="mobile-mode"><span className="mode-dot"/> MOCK MODE</span></div>
     <main className="content" id="main"><div className="desktop-top"><div className="breadcrumb">WORKSPACE <ChevronRight size={14}/> {current.label.toUpperCase()}</div><div className="top-right"><span className="version-pill">JAVA EDITION <b>1.8.9</b></span><span className="mode-pill"><span className="mode-dot"/> MOCK MODE</span></div></div>
@@ -98,6 +98,8 @@ function App(){
         {page==='instances'&&client.mode==='mock'&&<button className="button accent" onClick={()=>perform(()=>client.addInstance(),'新しいInstanceを観測しました')}><Plus size={17}/> Add instance</button>}
         {page==='accounts'&&<button className="button accent" onClick={()=>setAccountOpen(true)}><Plus size={17}/> Add account</button>}
       </div>
+      {client.mode==='remote'&&!snapshot.remoteConnected&&<div className="insight" role="status"><Radio size={18}/><p>backendとの接続待ちです。API_ORIGINとWebSocketプロキシを確認してください。</p></div>}
+      {client.mode==='remote'&&['jobs','accounts','settings'].includes(page)&&<div className="insight"><CircleHelp size={18}/><p>この画面の編集はMockモード用です。実Botの操作はBotsページから行ってください。</p></div>}
       {page==='dashboard'&&<Dashboard data={snapshot} active={active} live={live} pending={pending} go={go} perform={perform}/>}
       {page==='bots'&&<section className="view-section"><div className="toolbar"><div className="filter-row" role="group" aria-label="Bot絞り込み">{[['all','All'],['active','Active'],['idle','Idle'],['offline','Offline']].map(([v,l])=><button key={v} className={`filter ${filter===v?'is-active':''}`} onClick={()=>setFilter(v)}>{l}</button>)}</div><div className="search-box"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Bot / Instance を検索" aria-label="Bot検索"/></div></div>
         <div className="list-label">FLEET <span>{snapshot.bots.length} / {snapshot.settings.maxBots} BOTS</span></div>
