@@ -55,7 +55,7 @@ export function LiveViewModal({bot,onClose,remoteViewer}:{bot:Bot;onClose:()=>vo
       </div>}
       <div className="viewer-frame-wrap">
         {viewerUrl?<iframe key={`${bot.id}:${reload}:${viewerUrl}`} className="viewer-frame" src={viewerUrl} title={`${bot.name} Minecraft Live View`} sandbox="allow-scripts allow-same-origin allow-pointer-lock" allow="fullscreen; gamepad" referrerPolicy="no-referrer"/>:
-          <div className="viewer-empty"><Radio size={32}/><strong>Viewer URLを設定してください</strong><p>BBot backendのprismarine-viewer公開URLを入力すると、ここにBotの3D視点が表示されます。</p></div>}
+          <div className="viewer-empty"><Radio size={32}/><strong>{remoteViewer!==undefined?'Viewer tunnelを待っています':'Viewer URLを設定してください'}</strong><p>{remoteViewer!==undefined?'BBot側でViewerとQuick Tunnelが起動すると、この画面に自動で3D視点が表示されます。URLの貼り付けは不要です。':'BBot backendのprismarine-viewer公開URLを入力すると、ここにBotの3D視点が表示されます。'}</p></div>}
       </div>
       {viewerUrl&&<a className="viewer-open-link" href={viewerUrl} target="_blank" rel="noreferrer">別タブで開く <ExternalLink size={14}/></a>}
     </section>
