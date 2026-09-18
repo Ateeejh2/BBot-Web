@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Activity, ArrowRight, Bot as BotIcon, Check, ChevronDown, ChevronRight, CircleHelp, Database, LayoutDashboard, Layers3, ListChecks, MoreHorizontal, Play, Plus, Power, Radio, RotateCcw, ScrollText, Search, Settings2, ShieldCheck, Users, X } from 'lucide-react';
 import { bbotClient as client } from './client';
 import { ServerConnectionPanel } from './ServerConnectionPanel';
+import { LiveViewModal } from './LiveViewModal';
 import { botStates, validMinecraftUsername, type AccountKind, type Bot, type BotState, type InstanceStatus, type JobStatus, type LogEntry, type PartyCommandResult, type Snapshot, type TradeItem, type TradeState } from './client/types';
 type Page = 'dashboard'|'bots'|'instances'|'jobs'|'accounts'|'settings'|'logs';
 const nav:{id:Page;label:string;icon:typeof LayoutDashboard}[] = [
@@ -44,7 +45,7 @@ function TradePanel({bot,trade,onAction}:{bot:Bot;trade:TradeState;onAction:(tas
     </div>}
   </div>;
 }
-function BotCard({bot,compact,onAction,trade}:{bot:Bot;compact?:boolean;onAction:(task:()=>void)=>void;trade?:TradeState}){
+function BotCard({bot,compact,onAction,trade,onLiveView}:{bot:Bot;compact?:boolean;onAction:(task:()=>void)=>void;trade?:TradeState;onLiveView?:(bot:Bot)=>void}){
   const active=bot.state!=='DISCONNECTED';
   return <article className={`bot-card ${compact?'compact':''}`}>
     <div className="bot-main"><div className={`bot-avatar ${tone(bot.state)}`}><BotIcon size={21} strokeWidth={1.8}/></div>
@@ -54,6 +55,7 @@ function BotCard({bot,compact,onAction,trade}:{bot:Bot;compact?:boolean;onAction
     <div className="card-actions">
       {!active?<button className="mini primary-mini" onClick={()=>onAction(()=>client.startBot(bot.id))}><Play size={15}/> Start</button>:<button className="mini" onClick={()=>onAction(()=>client.stopBot(bot.id))}><Power size={15}/> Stop</button>}
       {active&&<button className="mini" onClick={()=>onAction(()=>client.recoverBot(bot.id))}><RotateCcw size={15}/> Recover</button>}
+      {!compact&&<button className="mini live-view-button" disabled={!active} onClick={()=>onLiveView?.(bot)}><Radio size={15}/> Live View</button>}
       {!compact&&<label className="select-wrap"><span className="sr-only">{bot.name} の状態</span><select value={bot.state} onChange={e=>onAction(()=>client.setBotState(bot.id,e.target.value as BotState))} aria-label={`${bot.name} の状態を試す`}>
         {botStates.map(s=><option key={s} value={s}>{s}</option>)}</select><ChevronDown size={13}/></label>}
     </div>
@@ -74,6 +76,7 @@ function App(){
   const [filter,setFilter]=useState('all'),[query,setQuery]=useState(''),[accountOpen,setAccountOpen]=useState(false);
   const [accountKind,setAccountKind]=useState<AccountKind>('SESSION'),[accountLabel,setAccountLabel]=useState('');
   const [jobInstance,setJobInstance]=useState('mega10c');
+  const [liveBotId,setLiveBotId]=useState<string|null>(null);
   useEffect(()=>{if(!more&&!accountOpen)return;const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape'){setMore(false);setAccountOpen(false)}};document.addEventListener('keydown',onKey);return()=>document.removeEventListener('keydown',onKey)},[more,accountOpen]);
   useEffect(()=>{if(!toast)return;const timer=setTimeout(()=>setToast(''),3700);return()=>clearTimeout(timer)},[toast]);
   const go=(v:Page)=>{setPage(v);setMore(false);setFilter('all');setQuery('');window.scrollTo({top:0,behavior:'smooth'});};
@@ -97,7 +100,7 @@ function App(){
       {page==='dashboard'&&<Dashboard data={snapshot} active={active} live={live} pending={pending} go={go} perform={perform}/>}
       {page==='bots'&&<section className="view-section"><div className="toolbar"><div className="filter-row" role="group" aria-label="Bot絞り込み">{[['all','All'],['active','Active'],['idle','Idle'],['offline','Offline']].map(([v,l])=><button key={v} className={`filter ${filter===v?'is-active':''}`} onClick={()=>setFilter(v)}>{l}</button>)}</div><div className="search-box"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Bot / Instance を検索" aria-label="Bot検索"/></div></div>
         <div className="list-label">FLEET <span>{snapshot.bots.length} / {snapshot.settings.maxBots} BOTS</span></div>
-        <div className="bot-grid">{snapshot.bots.filter(b=>(filter==='all'||filter==='active'&&b.state!=='DISCONNECTED'||filter==='offline'&&b.state==='DISCONNECTED'||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.id.includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase()))).map(b=><BotCard key={b.id} bot={b} trade={snapshot.trades[b.id]??client.getTradeState(b.id)} onAction={perform}/>)}</div>
+        <div className="bot-grid">{snapshot.bots.filter(b=>(filter==='all'||filter==='active'&&b.state!=='DISCONNECTED'||filter==='offline'&&b.state==='DISCONNECTED'||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.id.includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase()))).map(b=><BotCard key={b.id} bot={b} trade={snapshot.trades[b.id]??client.getTradeState(b.id)} onAction={perform} onLiveView={bot=>setLiveBotId(bot.id)}/>)}</div>
         {!snapshot.bots.some(b=>(filter==='all'||filter==='active'&&b.state!=='DISCONNECTED'||filter==='offline'&&b.state==='DISCONNECTED'||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase())))&&<Empty title="該当するBotがありません" detail="条件を変更して確認してください。"/>}</section>}
       {page==='instances'&&<section className="view-section"><div className="insight"><Activity size={18}/><p>Instance一覧は固定ではありません。Mockで追加・状態変更を試せます。確認済みの集合であり、総instance数ではありません。</p></div>
         <div className="list-label">OBSERVED INSTANCES <span>{snapshot.instances.length} FOUND</span></div><div className="instance-grid">{snapshot.instances.map(i=><InstanceCard key={i.id} id={i.id} status={i.status} count={snapshot.bots.filter(b=>b.instanceId===i.id).length} lastSeen={i.lastSeen} onAction={perform}/>)}</div></section>}
@@ -116,6 +119,7 @@ function App(){
     <nav className="bottom-nav" aria-label="モバイルナビゲーション">{nav.slice(0,4).map(n=><NavButton key={n.id} {...n} page={page} setPage={go}/>)}<button className={`nav-button ${['accounts','settings','logs'].includes(page)?'selected':''}`} aria-expanded={more} onClick={()=>setMore(true)}><MoreHorizontal size={20}/><span>More</span></button></nav>
     {more&&<div className="overlay" onClick={()=>setMore(false)}><div className="sheet" role="dialog" aria-modal="true" aria-label="その他の画面" onClick={e=>e.stopPropagation()}><div className="sheet-head"><b>More</b><button className="icon-button" aria-label="閉じる" onClick={()=>setMore(false)}><X size={21}/></button></div>{nav.slice(4).map(n=><button className="sheet-item" key={n.id} onClick={()=>go(n.id)}><n.icon size={19}/>{n.label}<ChevronRight size={17}/></button>)}<div className="sheet-foot">MOCK MODE · JAVA EDITION 1.8.9</div></div></div>}
     {accountOpen&&<div className="overlay" onClick={()=>setAccountOpen(false)}><div className="sheet form-sheet" role="dialog" aria-modal="true" aria-labelledby="account-title" onClick={e=>e.stopPropagation()}><div className="sheet-head"><b id="account-title">Add account</b><button className="icon-button" aria-label="閉じる" onClick={()=>setAccountOpen(false)}><X size={21}/></button></div><div className="form-body"><div className="type-tabs" role="group" aria-label="Account方式"><button className={accountKind==='SESSION'?'chosen':''} onClick={()=>setAccountKind('SESSION')}>Session Account</button><button className={accountKind==='MICROSOFT'?'chosen':''} onClick={()=>setAccountKind('MICROSOFT')}>Microsoft</button></div><label className="field-label" htmlFor="account-label">Display label</label><input id="account-label" maxLength={40} value={accountLabel} onChange={e=>setAccountLabel(e.target.value)} placeholder="例: Scout 07" autoComplete="off"/><div className="token-note"><ShieldCheck size={19}/><span>Mockではtoken入力を行いません。秘密情報は保持・保存されません。</span></div><button className="button accent full" onClick={()=>{try{client.addAccount(accountLabel,accountKind);setAccountOpen(false);setAccountLabel('');setToast('Mock Accountを追加しました')}catch(err){setToast(err instanceof Error?err.message:'追加に失敗しました')}}}><Plus size={17}/> Add Mock account</button></div></div></div>}
+    {liveBotId&&snapshot.bots.find(bot=>bot.id===liveBotId)&&<LiveViewModal bot={snapshot.bots.find(bot=>bot.id===liveBotId)!} onClose={()=>setLiveBotId(null)}/>}
     {toast&&<div className="toast" role="status"><Check size={16}/>{toast}</div>}
   </div>
 }
