@@ -9,8 +9,7 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
   const [label,setLabel]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [challenge,setChallenge]=useState<MicrosoftAuthChallenge|null>(null);
   const [kind,setKind]=useState<'MICROSOFT'|'SESSION'>('MICROSOFT');
-  const [profileName,setProfileName]=useState(''),[profileId,setProfileId]=useState('');
-  const accessToken=useRef<HTMLInputElement>(null),clientToken=useRef<HTMLInputElement>(null);
+  const accessToken=useRef<HTMLInputElement>(null);
 
   const waitForChallenge=async(accountId:string)=>{
     for(let i=0;i<40;i++){
@@ -80,16 +79,15 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
   };
 
   const addSession=async()=>{
-    const input={label,profileName,profileId,accessToken:accessToken.current?.value??'',clientToken:clientToken.current?.value??''};
+    const input={label,accessToken:accessToken.current?.value??''};
     if(accessToken.current)accessToken.current.value='';
-    if(clientToken.current)clientToken.current.value='';
     setBusy(true);setError('');
     try{
-      await client.addSessionAccount!(input);
-      setLabel('');setProfileName('');setProfileId('');
-      notify('Session Accountを追加しました');
-    }catch{
-      setError('追加できませんでした。入力内容を確認してください');
+      const account=await client.addSessionAccount!(input);
+      setLabel('');
+      notify(`${account.minecraftName??account.label} をSession Accountとして追加しました`);
+    }catch(e){
+      setError(e instanceof Error?e.message:'Session Accountを追加できませんでした');
     }finally{setBusy(false)}
   };
 
@@ -133,16 +131,10 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
       <div className="server-actions"><button className="button accent" disabled={busy||!/^\w[\w-]{0,39}$/.test(label)} onClick={()=>void add()}>Add Microsoft</button></div>
       {challenge&&<div className="token-note" role="status"><div><strong>Microsoft sign-in</strong><div>Code: <code>{challenge.userCode}</code></div><button className="button outline" onClick={()=>window.open(signInUrl(challenge),'_blank','noopener,noreferrer')}><ExternalLink size={15}/> Open Microsoft sign-in</button><small>Microsoftの /link ページでは code をURLの otc パラメータに渡して事前入力します。対応しないverification URIでは通常の認証ページへ戻します。</small></div></div>}
     </>:<>
-      <label className="field-label" htmlFor="session-profile-name">Minecraft ID / Profile Name</label>
-      <input id="session-profile-name" value={profileName} maxLength={16} autoComplete="off" onChange={e=>setProfileName(e.target.value)}/>
-      <label className="field-label" htmlFor="session-profile-id">Profile UUID</label>
-      <input id="session-profile-id" value={profileId} maxLength={36} autoComplete="off" onChange={e=>setProfileId(e.target.value)}/>
-      <label className="field-label" htmlFor="session-access-token">Access Token</label>
+      <label className="field-label" htmlFor="session-access-token">Minecraft Access Token</label>
       <input id="session-access-token" ref={accessToken} type="password" autoComplete="off" maxLength={2048}/>
-      <label className="field-label" htmlFor="session-client-token">Client Token</label>
-      <input id="session-client-token" ref={clientToken} type="password" autoComplete="off" maxLength={256}/>
-      <div className="server-actions"><button className="button accent" disabled={busy||!/^\w[\w-]{0,39}$/.test(label)||!/^\w{1,16}$/.test(profileName)||!profileId} onClick={()=>void addSession()}>Add Session</button></div>
-      <p className="muted">Sessionの形式を検証して保存します。READYは接続成功を保証せず、Start時にサーバーが認証します。</p>
+      <div className="server-actions"><button className="button accent" disabled={busy||!/^\w[\w-]{0,39}$/.test(label)} onClick={()=>void addSession()}>Add Session</button></div>
+      <p className="muted">Minecraft ServicesのAccess Tokenだけで追加できます。backendがそのtokenでMCIDとProfile UUIDを取得し、token自体はWebSocket・Logs・runtime metadataには出しません。</p>
     </>}
     {error&&<p role="alert" className="server-error">{error}</p>}
   </div>
