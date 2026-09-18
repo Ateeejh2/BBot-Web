@@ -4,7 +4,7 @@ export type BotState = typeof botStates[number];
 export type InstanceStatus = 'ACTIVE' | 'SUSPECT' | 'INACTIVE';
 export type JobStatus = 'QUEUED' | 'ASSIGNED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
 export type AccountKind = 'SESSION' | 'MICROSOFT';
-export interface Bot { id:string; accountId:string; name:string; state:BotState; instanceId?:string; x:number;y:number;z:number; jobId?:string; updatedAt:number; kickReason?:string }
+export interface Bot { id:string; accountId:string; name:string; state:BotState; instanceId?:string; x:number;y:number;z:number; jobId?:string; updatedAt:number; kickReason?:string; kickedAt?:number }
 export interface Instance { id:string; status:InstanceStatus; firstSeen:number; lastSeen:number; metadata?:string }
 export interface Job { id:string; eventType:string; instanceId:string; state:JobStatus; botId?:string; x:number;y:number;z:number; expiresAt:number }
 export interface Account { id:string; label:string; kind:AccountKind; status:'READY'|'UNASSIGNED'|'WAITING_FOR_LOGIN'|'ERROR'; minecraftName?:string; assignedBot?:string; createdAt:number }
