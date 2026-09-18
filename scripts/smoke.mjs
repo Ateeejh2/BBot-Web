@@ -141,9 +141,10 @@ try {
   assert.ok(remoteAccounts.includes('Session'));
   const sessionSource=await (await import('node:fs/promises')).readFile('src/RemoteAccountsPanel.tsx','utf8');
   assert.match(sessionSource,/id="session-access-token"[^>]*type="password"[^>]*autoComplete="off"/);
-  assert.match(sessionSource,/id="session-client-token"[^>]*type="password"[^>]*autoComplete="off"/);
+  assert.equal(sessionSource.includes('session-client-token'),false);
+  assert.equal(sessionSource.includes('session-profile-name'),false);
+  assert.equal(sessionSource.includes('session-profile-id'),false);
   assert.match(sessionSource,/accessToken\.current\.value=''/);
-  assert.match(sessionSource,/clientToken\.current\.value=''/);
   const { RemoteBBotClient } = await server.ssrLoadModule('/src/client/remote.ts');
   const oldWindow=globalThis.window,oldSocket=globalThis.WebSocket,oldFetch=globalThis.fetch;
   const oldLocalStorage=globalThis.localStorage,oldSessionStorage=globalThis.sessionStorage;
@@ -170,15 +171,16 @@ try {
     assert.equal(remote.getServerConnection().host,'play.example.com');
     assert.equal((await remote.saveServerConnection({host:'next.example',port:25565,version:'1.8.9'})).revision,3);
     await remote.addMicrosoftAccount('Second');await remote.assignAccount('bot-1','account-2');
-    const submitted=await remote.addSessionAccount({label:'Session',profileName:'MCName',
-      profileId:'12345678123412341234123456789abc',accessToken:'TEST_ACCESS',clientToken:'TEST_CLIENT'});
+    const submitted=await remote.addSessionAccount({label:'Session',accessToken:'TEST_ACCESS'});
     assert.equal(submitted.kind,'SESSION');
     assert.equal(JSON.stringify(remote.getSnapshot()).includes('TEST_ACCESS'),false);
     assert.equal(remote.getSnapshot().accounts[1].assignedBot,'bot-1');
     assert.equal(requests.some(r=>r.path==='/api/v1/settings/server'&&r.options.method==='PUT'),true);
     assert.equal(requests.some(r=>r.path==='/api/v1/accounts'&&r.options.method==='POST'),true);
     assert.equal(JSON.stringify(requests).includes('SECRET_REFRESH_TOKEN'),false);
-    assert.equal(requests.filter(r=>r.options?.body&&/accessToken|clientToken/.test(r.options.body)).length,1);
+    assert.equal(requests.filter(r=>r.options?.body&&/accessToken/.test(r.options.body)).length,1);
+    assert.equal(JSON.stringify(requests).includes('clientToken'),false);
+    assert.equal(JSON.stringify(requests).includes('profileId'),false);
     assert.equal(browserWrites,0);
   }finally{globalThis.window=oldWindow;globalThis.WebSocket=oldSocket;globalThis.fetch=oldFetch;
     globalThis.localStorage=oldLocalStorage;globalThis.sessionStorage=oldSessionStorage}
