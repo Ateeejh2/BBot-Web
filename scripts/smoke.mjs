@@ -204,7 +204,7 @@ try {
     assert.equal(remote.getSnapshot().accounts.find(a=>a.id===sessionAccountId)?.status,'ERROR');
     assert.equal(JSON.stringify(remote.getSnapshot()).includes('TEST_ACCESS'),false);
     assert.equal(JSON.stringify(remote.getSnapshot()).includes('TEST_ACCESS_REPLACED'),false);
-    assert.equal(remote.getSnapshot().accounts[1].assignedBot,'bot-1');
+    assert.equal(remote.getSnapshot().accounts.find(a=>a.id===sessionAccountId)?.assignedBot,'bot-1');
     assert.equal(requests.some(r=>r.path==='/api/v1/settings/server'&&r.options.method==='PUT'),true);
     assert.equal(requests.some(r=>r.path==='/api/v1/accounts'&&r.options.method==='POST'),true);
     assert.equal(JSON.stringify(requests).includes('SECRET_REFRESH_TOKEN'),false);
