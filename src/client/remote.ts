@@ -1,4 +1,4 @@
-import type { BBotClient, BotState, Snapshot, Settings, InstanceStatus, JobStatus, AccountKind, TradeState, TradeClickRequest, PartyCommandResult } from './types';
+import type { BBotClient, BotState, Snapshot, Settings, InstanceStatus, JobStatus, AccountKind, TradeState, TradeClickRequest, PartyCommandResult, Account, MicrosoftAuthChallenge } from './types';
 import { defaultServerConnection, type ServerConnection, type ReconnectResult } from './serverConnection';
 
 type Wire = { version:number; bots:Array<{id:string;accountId?:string;accountLabel:string;minecraftName?:string;state:BotState;instanceId?:string;position?:{x:number;y:number;z:number}}>;
@@ -57,7 +57,16 @@ export class RemoteBBotClient implements BBotClient {
     this.current={...this.current,serverConnection:record};this.listeners.forEach(listener=>listener());return record;
   }
   async addMicrosoftAccount(label:string){
-    await this.request('/api/v1/accounts','POST',{kind:'MICROSOFT',label});await this.refresh();
+    const account=await this.request('/api/v1/accounts','POST',{kind:'MICROSOFT',label}) as Account;
+    await this.refresh();
+    return account;
+  }
+  async getMicrosoftAuthChallenge(accountId:string){
+    if(!/^[0-9a-f-]{36}$/.test(accountId))throw Error('無効なAccount IDです');
+    const r=await fetch(`/api/v1/accounts/${accountId}/auth-challenge`,{credentials:'same-origin',cache:'no-store'});
+    if(!r.ok)throw Error('Microsoft認証情報の取得に失敗しました');
+    const data=await r.json() as {challenge:MicrosoftAuthChallenge|null};
+    return data.challenge??null;
   }
   async retryAccount(accountId:string){
     if(!/^[0-9a-f-]{36}$/.test(accountId))throw Error('無効なAccount IDです');
