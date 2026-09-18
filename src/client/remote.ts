@@ -80,9 +80,16 @@ export class RemoteBBotClient implements BBotClient {
     return account;
   }
   async addSessionAccount(input:SessionAccountInput){
-    const account=await this.request('/api/v1/accounts','POST',{kind:'SESSION',...input}) as Account;
+    const r=await fetch('/api/v1/accounts',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({kind:'SESSION',...input}),credentials:'same-origin'});
+    const data=await r.json().catch(()=>null) as (Account|{error?:string}|null);
+    if(!r.ok){
+      const code=data&&'error'in data?data.error:undefined;
+      if(code==='INVALID_SESSION_TOKEN')throw Error('Minecraft Access Tokenが無効、期限切れ、またはMinecraftプロフィールを取得できません');
+      throw Error(r.status===400?'入力を確認してください':r.status===409?'同じlabelのAccountがあります':'Session Accountの追加に失敗しました');
+    }
     await this.refresh();
-    return account;
+    return data as Account;
   }
   async getMicrosoftAuthChallenge(accountId:string){
     if(!/^[0-9a-f-]{36}$/.test(accountId))throw Error('無効なAccount IDです');
