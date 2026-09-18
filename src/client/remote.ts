@@ -40,10 +40,28 @@ export class RemoteBBotClient implements BBotClient {
   private async action(id:string,name:'connect'|'join-pit'|'disconnect'){
     if(!/^bot-[1-9]\d*$/.test(id))throw Error('無効なBot IDです');
     const r=await fetch(`/api/v1/bots/${id}/actions/${name}`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',credentials:'same-origin'});
-    if(!r.ok)throw Error(r.status===409?'現在のBot stateでは操作できません':r.status===404?'Botが見つかりません':'操作に失敗しました');
-    this.apply(await r.json() as Wire);
+    const data=await r.json().catch(()=>null) as (Wire|{error?:string}|null);
+    if(!r.ok){
+      const code=data&&'error'in data?data.error:undefined;
+      const message=code==='ACCOUNT_REQUIRED'?'AccountがBotに割り当てられていません':
+        code==='INVALID_STATE'?'現在のBot stateでは操作できません':
+        code==='CONFLICT'?'設定変更または認証処理中です。少し待って再試行してください':
+        r.status===404?'Botが見つかりません':'操作に失敗しました';
+      throw Error(message);
+    }
+    this.apply(data as Wire);
   }
-  startBot(id:string){return this.action(id,'connect')}
+  async startBot(id:string){
+    const bot=this.current.bots.find(b=>b.id===id);
+    if(!bot)throw Error('Botが見つかりません');
+    if(!bot.accountId){
+      const candidates=this.current.accounts.filter(a=>a.status==='READY'&&(a.assignedBot===undefined||a.assignedBot===id));
+      if(candidates.length===1)await this.assignAccount(id,candidates[0]!.id);
+      else if(candidates.length===0)throw Error('READYのMicrosoft Accountを追加してからStartしてください');
+      else throw Error('Accountsで使用するAccountをBotに割り当ててください');
+    }
+    return this.action(id,'connect');
+  }
   stopBot(id:string){return this.action(id,'disconnect')}
   joinPit(id:string){return this.action(id,'join-pit')}
   getServerConnection=()=>this.current.serverConnection;
