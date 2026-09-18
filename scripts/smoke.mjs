@@ -138,6 +138,12 @@ try {
   const remoteAccounts=renderToString(createElement(RemoteAccountsPanel,{snapshot:remoteSnapshot,notify:()=>{}}));
   assert.ok(remoteAccounts.includes('Add Microsoft')&&remoteAccounts.includes('Scout')&&remoteAccounts.includes('assignment'));
   assert.equal(remoteAccounts.includes('SECRET_REFRESH_TOKEN'),false);
+  assert.ok(remoteAccounts.includes('Session'));
+  const sessionSource=await (await import('node:fs/promises')).readFile('src/RemoteAccountsPanel.tsx','utf8');
+  assert.match(sessionSource,/id="session-access-token"[^>]*type="password"[^>]*autoComplete="off"/);
+  assert.match(sessionSource,/id="session-client-token"[^>]*type="password"[^>]*autoComplete="off"/);
+  assert.match(sessionSource,/accessToken\.current\.value=''/);
+  assert.match(sessionSource,/clientToken\.current\.value=''/);
   const { RemoteBBotClient } = await server.ssrLoadModule('/src/client/remote.ts');
   const oldWindow=globalThis.window,oldSocket=globalThis.WebSocket,oldFetch=globalThis.fetch;
   const oldLocalStorage=globalThis.localStorage,oldSessionStorage=globalThis.sessionStorage;
@@ -152,7 +158,9 @@ try {
       requests.push({path,options});
       if(path==='/api/v1/settings/server'){const result={...JSON.parse(options.body),revision:3};wire={...wire,serverConnection:result};return Response.json(result)}
       if(path==='/api/v1/accounts'&&options.method==='POST'){
-        const account={id:'account-2',label:JSON.parse(options.body).label,kind:'MICROSOFT',status:'WAITING_FOR_LOGIN',createdAt:1};
+        const submitted=JSON.parse(options.body);
+        const account={id:submitted.kind==='SESSION'?'account-3':'account-2',label:submitted.label,kind:submitted.kind,
+          status:submitted.kind==='SESSION'?'READY':'WAITING_FOR_LOGIN',createdAt:1};
         wire={...wire,accounts:[...wire.accounts,account]};return Response.json(account,{status:201});
       }
       if(path==='/api/v1/bots/bot-1/account'){wire={...wire,accounts:wire.accounts.map(a=>({...a,assignedBot:a.id==='account-2'?'bot-1':undefined}))};return Response.json(wire.accounts[1])}
@@ -162,11 +170,15 @@ try {
     assert.equal(remote.getServerConnection().host,'play.example.com');
     assert.equal((await remote.saveServerConnection({host:'next.example',port:25565,version:'1.8.9'})).revision,3);
     await remote.addMicrosoftAccount('Second');await remote.assignAccount('bot-1','account-2');
+    const submitted=await remote.addSessionAccount({label:'Session',profileName:'MCName',
+      profileId:'12345678123412341234123456789abc',accessToken:'TEST_ACCESS',clientToken:'TEST_CLIENT'});
+    assert.equal(submitted.kind,'SESSION');
+    assert.equal(JSON.stringify(remote.getSnapshot()).includes('TEST_ACCESS'),false);
     assert.equal(remote.getSnapshot().accounts[1].assignedBot,'bot-1');
     assert.equal(requests.some(r=>r.path==='/api/v1/settings/server'&&r.options.method==='PUT'),true);
     assert.equal(requests.some(r=>r.path==='/api/v1/accounts'&&r.options.method==='POST'),true);
     assert.equal(JSON.stringify(requests).includes('SECRET_REFRESH_TOKEN'),false);
-    assert.equal(requests.some(r=>r.options?.body&&/token|password|credential/i.test(r.options.body)),false);
+    assert.equal(requests.filter(r=>r.options?.body&&/accessToken|clientToken/.test(r.options.body)).length,1);
     assert.equal(browserWrites,0);
   }finally{globalThis.window=oldWindow;globalThis.WebSocket=oldSocket;globalThis.fetch=oldFetch;
     globalThis.localStorage=oldLocalStorage;globalThis.sessionStorage=oldSessionStorage}

@@ -1,4 +1,4 @@
-import type { BBotClient, BotState, Snapshot, Settings, InstanceStatus, JobStatus, AccountKind, TradeState, TradeClickRequest, PartyCommandResult, Account, MicrosoftAuthChallenge } from './types';
+import type { BBotClient, BotState, Snapshot, Settings, InstanceStatus, JobStatus, AccountKind, TradeState, TradeClickRequest, PartyCommandResult, Account, MicrosoftAuthChallenge, SessionAccountInput } from './types';
 import { defaultServerConnection, type ServerConnection, type ReconnectResult } from './serverConnection';
 
 type Wire = { version:number; bots:Array<{id:string;accountId?:string;accountLabel:string;minecraftName?:string;state:BotState;instanceId?:string;position?:{x:number;y:number;z:number}}>;
@@ -57,7 +57,7 @@ export class RemoteBBotClient implements BBotClient {
     if(!bot.accountId){
       const candidates=this.current.accounts.filter(a=>a.status==='READY'&&(a.assignedBot===undefined||a.assignedBot===id));
       if(candidates.length===1)await this.assignAccount(id,candidates[0]!.id);
-      else if(candidates.length===0)throw Error('READYのMicrosoft Accountを追加してからStartしてください');
+      else if(candidates.length===0)throw Error('READYのAccountを追加してからStartしてください');
       else throw Error('Accountsで使用するAccountをBotに割り当ててください');
     }
     return this.action(id,'connect');
@@ -76,6 +76,11 @@ export class RemoteBBotClient implements BBotClient {
   }
   async addMicrosoftAccount(label:string){
     const account=await this.request('/api/v1/accounts','POST',{kind:'MICROSOFT',label}) as Account;
+    await this.refresh();
+    return account;
+  }
+  async addSessionAccount(input:SessionAccountInput){
+    const account=await this.request('/api/v1/accounts','POST',{kind:'SESSION',...input}) as Account;
     await this.refresh();
     return account;
   }

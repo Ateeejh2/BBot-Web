@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ExternalLink, Trash2 } from 'lucide-react';
 import { bbotClient as client } from './client';
 import type { MicrosoftAuthChallenge, Snapshot } from './client/types';
@@ -8,6 +8,9 @@ const delay=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
 export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:(message:string)=>void}){
   const [label,setLabel]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [challenge,setChallenge]=useState<MicrosoftAuthChallenge|null>(null);
+  const [kind,setKind]=useState<'MICROSOFT'|'SESSION'>('MICROSOFT');
+  const [profileName,setProfileName]=useState(''),[profileId,setProfileId]=useState('');
+  const accessToken=useRef<HTMLInputElement>(null),clientToken=useRef<HTMLInputElement>(null);
 
   const waitForChallenge=async(accountId:string)=>{
     for(let i=0;i<40;i++){
@@ -76,6 +79,20 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
     finally{setBusy(false)}
   };
 
+  const addSession=async()=>{
+    const input={label,profileName,profileId,accessToken:accessToken.current?.value??'',clientToken:clientToken.current?.value??''};
+    if(accessToken.current)accessToken.current.value='';
+    if(clientToken.current)clientToken.current.value='';
+    setBusy(true);setError('');
+    try{
+      await client.addSessionAccount!(input);
+      setLabel('');setProfileName('');setProfileId('');
+      notify('Session Accountを追加しました');
+    }catch{
+      setError('追加できませんでした。入力内容を確認してください');
+    }finally{setBusy(false)}
+  };
+
   const assign=async(botId:string,accountId:string|null)=>{
     setBusy(true);setError('');
     try {await client.assignAccount!(botId,accountId);notify(accountId?`${botId} にAccountを割り当てました`:`${botId} のAccount割当を解除しました`)}
@@ -83,8 +100,8 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
     finally{setBusy(false)}
   };
 
-  const remove=async(accountId:string,accountLabel:string)=>{
-    if(!window.confirm(`${accountLabel} をBBotから削除しますか？\nBotが使用中の場合は削除できません。Microsoft認証キャッシュは残ります。`))return;
+  const remove=async(accountId:string,accountLabel:string,accountKind:'MICROSOFT'|'SESSION')=>{
+    if(!window.confirm(`${accountLabel} をBBotから削除しますか？\nBotが使用中の場合は削除できません。${accountKind==='SESSION'?'Session credentialも削除されます。':'Microsoft認証キャッシュは残ります。'}`))return;
     setBusy(true);setError('');
     try {await client.deleteAccount!(accountId);if(challenge)setChallenge(null);notify(`${accountLabel} を削除しました`)}
     catch(e){setError(e instanceof Error?e.message:'Accountの削除に失敗しました')}
@@ -107,24 +124,37 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
     }finally{setBusy(false)}
   };
 
-  return <section className="view-section"><div className="panel"><h2>Add Microsoft Account</h2>
-    <p className="muted">Add Microsoftを押すとMicrosoftのサインイン画面を開きます。Webには短時間だけdevice codeを表示しますが、access tokenやrefresh tokenは送信・保存しません。</p>
+  return <section className="view-section"><div className="panel"><h2>Add Account</h2>
+    <div className="server-actions"><button className="button outline" aria-pressed={kind==='MICROSOFT'} onClick={()=>setKind('MICROSOFT')}>Microsoft</button><button className="button outline" aria-pressed={kind==='SESSION'} onClick={()=>setKind('SESSION')}>Session</button></div>
+    {kind==='MICROSOFT'&&<p className="muted">Add Microsoftを押すとMicrosoftのサインイン画面を開きます。Webには短時間だけdevice codeを表示しますが、access tokenやrefresh tokenは送信・保存しません。</p>}
     <label className="field-label" htmlFor="remote-account-label">Display label</label>
     <input id="remote-account-label" value={label} maxLength={40} autoComplete="off" onChange={e=>setLabel(e.target.value)} placeholder="Scout_01"/>
-    <div className="server-actions"><button className="button accent" disabled={busy||!/^\w[\w-]{0,39}$/.test(label)} onClick={()=>void add()}>Add Microsoft</button></div>
-    {challenge&&<div className="token-note" role="status"><div><strong>Microsoft sign-in</strong><div>Code: <code>{challenge.userCode}</code></div><button className="button outline" onClick={()=>window.open(signInUrl(challenge),'_blank','noopener,noreferrer')}><ExternalLink size={15}/> Open Microsoft sign-in</button><small>Microsoftの /link ページでは code をURLの otc パラメータに渡して事前入力します。対応しないverification URIでは通常の認証ページへ戻します。</small></div></div>}
-    <p className="muted">Session Accountは現在の認証ライブラリで安全なMicrosoftセッション入力経路を確認できないため非対応です。</p>
+    {kind==='MICROSOFT'?<>
+      <div className="server-actions"><button className="button accent" disabled={busy||!/^\w[\w-]{0,39}$/.test(label)} onClick={()=>void add()}>Add Microsoft</button></div>
+      {challenge&&<div className="token-note" role="status"><div><strong>Microsoft sign-in</strong><div>Code: <code>{challenge.userCode}</code></div><button className="button outline" onClick={()=>window.open(signInUrl(challenge),'_blank','noopener,noreferrer')}><ExternalLink size={15}/> Open Microsoft sign-in</button><small>Microsoftの /link ページでは code をURLの otc パラメータに渡して事前入力します。対応しないverification URIでは通常の認証ページへ戻します。</small></div></div>}
+    </>:<>
+      <label className="field-label" htmlFor="session-profile-name">Minecraft ID / Profile Name</label>
+      <input id="session-profile-name" value={profileName} maxLength={16} autoComplete="off" onChange={e=>setProfileName(e.target.value)}/>
+      <label className="field-label" htmlFor="session-profile-id">Profile UUID</label>
+      <input id="session-profile-id" value={profileId} maxLength={36} autoComplete="off" onChange={e=>setProfileId(e.target.value)}/>
+      <label className="field-label" htmlFor="session-access-token">Access Token</label>
+      <input id="session-access-token" ref={accessToken} type="password" autoComplete="off" maxLength={2048}/>
+      <label className="field-label" htmlFor="session-client-token">Client Token</label>
+      <input id="session-client-token" ref={clientToken} type="password" autoComplete="off" maxLength={256}/>
+      <div className="server-actions"><button className="button accent" disabled={busy||!/^\w[\w-]{0,39}$/.test(label)||!/^\w{1,16}$/.test(profileName)||!profileId} onClick={()=>void addSession()}>Add Session</button></div>
+      <p className="muted">Sessionの形式を検証して保存します。READYは接続成功を保証せず、Start時にサーバーが認証します。</p>
+    </>}
     {error&&<p role="alert" className="server-error">{error}</p>}
   </div>
   <div className="list-label">ACCOUNTS <span>{snapshot.accounts.length}</span></div>
   <div className="account-list">{snapshot.accounts.map(account=><div className="account-row" key={account.id}>
     <div className="account-avatar">{account.label.slice(0,1).toUpperCase()}</div>
-    <div><strong>{account.minecraftName??account.label}</strong><span>{account.minecraftName?`${account.label} · `:''}Microsoft · {account.status} · {account.assignedBot??'Unassigned'}</span></div>
+    <div><strong>{account.minecraftName??account.label}</strong><span>{account.minecraftName?`${account.label} · `:''}{account.kind==='SESSION'?'Session':'Microsoft'} · {account.status} · {account.assignedBot??'Unassigned'}</span></div>
     <div className="server-actions">
-      {account.status==='ERROR'?<button className="mini" disabled={busy} onClick={()=>void retry(account.id)}>Retry</button>:
-        account.status==='WAITING_FOR_LOGIN'?<button className="mini primary-mini" disabled={busy} onClick={()=>void openSignIn(account.id)}>Sign in</button>:
+      {account.kind==='MICROSOFT'&&account.status==='ERROR'?<button className="mini" disabled={busy} onClick={()=>void retry(account.id)}>Retry</button>:
+        account.kind==='MICROSOFT'&&account.status==='WAITING_FOR_LOGIN'?<button className="mini primary-mini" disabled={busy} onClick={()=>void openSignIn(account.id)}>Sign in</button>:
         <span className="account-lock">Ready</span>}
-      <button className="mini" disabled={busy||Boolean(account.assignedBot&&snapshot.bots.find(b=>b.id===account.assignedBot)?.state!=='DISCONNECTED')} onClick={()=>void remove(account.id,account.label)} title={account.assignedBot&&snapshot.bots.find(b=>b.id===account.assignedBot)?.state!=='DISCONNECTED'?'使用中のBotをStopしてから削除してください':'Accountを削除'}>
+      <button className="mini" disabled={busy||Boolean(account.assignedBot&&snapshot.bots.find(b=>b.id===account.assignedBot)?.state!=='DISCONNECTED')} onClick={()=>void remove(account.id,account.label,account.kind)} title={account.assignedBot&&snapshot.bots.find(b=>b.id===account.assignedBot)?.state!=='DISCONNECTED'?'使用中のBotをStopしてから削除してください':'Accountを削除'}>
         <Trash2 size={14}/> Delete
       </button>
     </div>
