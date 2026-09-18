@@ -135,6 +135,8 @@ try {
   const remoteSettings=renderToString(createElement(ServerConnectionPanel,{snapshot:remoteSnapshot,notify:()=>{},mode:'remote'}));
   assert.ok(remoteSettings.includes('play.example.com')&&remoteSettings.includes('25566')&&remoteSettings.includes('Save'));
   assert.equal(remoteSettings.includes('Save &amp; Reconnect'),false);
+  const serverSource=await (await import('node:fs/promises')).readFile('src/ServerConnectionPanel.tsx','utf8');
+  assert.match(serverSource,/remoteActive=.*startQueued/);
   const remoteAccounts=renderToString(createElement(RemoteAccountsPanel,{snapshot:remoteSnapshot,notify:()=>{}}));
   assert.ok(remoteAccounts.includes('Add Microsoft')&&remoteAccounts.includes('Scout')&&remoteAccounts.includes('assignment'));
   assert.equal(remoteAccounts.includes('SECRET_REFRESH_TOKEN'),false);
