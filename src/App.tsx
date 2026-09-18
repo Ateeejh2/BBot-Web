@@ -47,11 +47,11 @@ function TradePanel({bot,trade,onAction}:{bot:Bot;trade:TradeState;onAction:(tas
   </div>;
 }
 function BotCard({bot,compact,onAction,trade,onLiveView}:{bot:Bot;compact?:boolean;onAction:(task:()=>void|Promise<void>)=>void;trade?:TradeState;onLiveView?:(bot:Bot)=>void}){
-  const active=bot.state!=='DISCONNECTED';
+  const active=bot.state!=='DISCONNECTED'||Boolean(bot.startQueued);
   return <article className={`bot-card ${compact?'compact':''}`}>
     <div className="bot-main"><div className={`bot-avatar ${tone(bot.state)}`}><BotIcon size={21} strokeWidth={1.8}/></div>
       <div className="bot-identity"><strong>{bot.name}</strong><span className="mono faint">{bot.id} · {bot.instanceId??'No instance'}</span></div>
-      <Badge status={bot.state} label={short[bot.state]}/></div>
+      <Badge status={bot.state} label={bot.startQueued?'Queued':short[bot.state]}/></div>
     {bot.kickReason&&<div className={`bot-kick ${compact?'compact-kick':''}`} role={bot.state==='DISCONNECTED'?'alert':'status'}>
       <AlertTriangle size={15}/><div><strong>Last kick{bot.kickedAt!==undefined?` · ${rel(bot.kickedAt)}`:''}</strong><span>{bot.kickReason}</span></div>
     </div>}
@@ -86,7 +86,7 @@ function App(){
   const go=(v:Page)=>{setPage(v);setMore(false);setFilter('all');setQuery('');window.scrollTo({top:0,behavior:'smooth'});};
   const perform=(task:()=>void|Promise<void>,success='操作を送信しました')=>{void Promise.resolve().then(task).then(()=>setToast(success)).catch(err=>setToast(err instanceof Error?err.message:'操作に失敗しました'))};
   const active=snapshot.bots.filter(b=>b.state!=='DISCONNECTED').length;
-  const assignedReadyOffline=snapshot.bots.filter(b=>b.state==='DISCONNECTED'&&snapshot.accounts.some(a=>a.assignedBot===b.id&&a.status==='READY')).length;
+  const assignedReadyOffline=snapshot.bots.filter(b=>b.state==='DISCONNECTED'&&!b.startQueued&&snapshot.accounts.some(a=>a.assignedBot===b.id&&a.status==='READY')).length;
   const live=snapshot.bots.filter(b=>['IN_PIT_IDLE','PATHFINDING','WORKING'].includes(b.state)).length;
   const pending=snapshot.jobs.filter(j=>['QUEUED','ASSIGNED','RUNNING'].includes(j.state)).length;
   const current=nav.find(n=>n.id===page)!;
@@ -100,8 +100,8 @@ function App(){
       <div className="page-head"><div><div className="eyebrow">BBOT / {current.label.toUpperCase()}</div><h1>{page==='dashboard'?'Command center':current.label}</h1><p>{({dashboard:client.mode==='remote'?'実Bot backendを操作・監視する管理画面。':'20クライアントまでを見渡す、Mockの管理画面。',bots:'各Botの状態と操作をまとめて確認。',instances:'発見したPit instanceの状態を確認。',jobs:'イベントの割当と進行状況を確認。',accounts:client.mode==='remote'?'Microsoft / Session Accountの追加とBot割当。':'Session Accountの表示と追加を試す。',settings:client.mode==='remote'?'実Minecraft接続先の設定。':'Mock環境の表示設定と動作値。',logs:client.mode==='remote'?'実Botの操作履歴。':'Mock操作の履歴。秘密情報は記録しません。'} as Record<Page,string>)[page]}</p></div>
         {page==='bots'&&client.mode==='mock'&&<button className="button accent" disabled={snapshot.bots.length>=20} onClick={()=>perform(()=>{client.updateSettings({maxBots:20});client.createBots(20)},'20 BotのMock状態を生成しました')}><Plus size={17}/> Generate 20 Bots</button>}
         {page==='bots'&&client.mode==='remote'&&<div className="server-actions">
-          <button className="button accent" disabled={assignedReadyOffline===0} onClick={()=>perform(()=>client.startAssignedBots!(),`割当済み ${assignedReadyOffline} BotのStartを予約しました`)}><Play size={17}/> Start Assigned</button>
-          <button className="button outline" disabled={active===0} onClick={()=>perform(()=>client.stopAllBots!(),'全Botを停止しました')}><Power size={17}/> Stop All</button>
+          <button className="button accent" disabled={assignedReadyOffline===0} onClick={()=>perform(async()=>{await client.startAssignedBots!()},`割当済み ${assignedReadyOffline} BotのStartを予約しました`)}><Play size={17}/> Start Assigned</button>
+          <button className="button outline" disabled={active===0&&!snapshot.bots.some(b=>b.startQueued)} onClick={()=>perform(async()=>{await client.stopAllBots!()},'全Botを停止しました')}><Power size={17}/> Stop All</button>
         </div>}
         {page==='instances'&&client.mode==='mock'&&<button className="button accent" onClick={()=>perform(()=>client.addInstance(),'新しいInstanceを観測しました')}><Plus size={17}/> Add instance</button>}
         {page==='accounts'&&client.mode==='mock'&&<button className="button accent" onClick={()=>setAccountOpen(true)}><Plus size={17}/> Add account</button>}
@@ -111,7 +111,7 @@ function App(){
       {page==='dashboard'&&<Dashboard data={snapshot} active={active} live={live} pending={pending} go={go} perform={perform}/>}
       {page==='bots'&&<section className="view-section"><div className="toolbar"><div className="filter-row" role="group" aria-label="Bot絞り込み">{[['all','All'],['active','Active'],['idle','Idle'],['offline','Offline']].map(([v,l])=><button key={v} className={`filter ${filter===v?'is-active':''}`} onClick={()=>setFilter(v)}>{l}</button>)}</div><div className="search-box"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Bot / Instance を検索" aria-label="Bot検索"/></div></div>
         <div className="list-label">FLEET <span>{snapshot.bots.length} / {snapshot.settings.maxBots} BOTS</span></div>
-        <div className="bot-grid">{snapshot.bots.filter(b=>(filter==='all'||filter==='active'&&b.state!=='DISCONNECTED'||filter==='offline'&&b.state==='DISCONNECTED'||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.id.includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase()))).map(b=><BotCard key={b.id} bot={b} trade={snapshot.trades[b.id]??client.getTradeState(b.id)} onAction={perform} onLiveView={bot=>setLiveBotId(bot.id)}/>)}</div>
+        <div className="bot-grid">{snapshot.bots.filter(b=>(filter==='all'||filter==='active'&&(b.state!=='DISCONNECTED'||Boolean(b.startQueued))||filter==='offline'&&b.state==='DISCONNECTED'&&!b.startQueued||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.id.includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase()))).map(b=><BotCard key={b.id} bot={b} trade={snapshot.trades[b.id]??client.getTradeState(b.id)} onAction={perform} onLiveView={bot=>setLiveBotId(bot.id)}/>)}</div>
         {!snapshot.bots.some(b=>(filter==='all'||filter==='active'&&b.state!=='DISCONNECTED'||filter==='offline'&&b.state==='DISCONNECTED'||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase())))&&<Empty title="該当するBotがありません" detail="条件を変更して確認してください。"/>}</section>}
       {page==='instances'&&<section className="view-section"><div className="insight"><Activity size={18}/><p>Instance一覧は固定ではありません。Mockで追加・状態変更を試せます。確認済みの集合であり、総instance数ではありません。</p></div>
         <div className="list-label">OBSERVED INSTANCES <span>{snapshot.instances.length} FOUND</span></div><div className="instance-grid">{snapshot.instances.map(i=><InstanceCard key={i.id} id={i.id} status={i.status} count={snapshot.bots.filter(b=>b.instanceId===i.id).length} lastSeen={i.lastSeen} onAction={perform}/>)}</div></section>}
