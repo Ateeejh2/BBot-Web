@@ -18,11 +18,17 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
     return null;
   };
 
-  const showChallenge=(next:MicrosoftAuthChallenge,popup?:Window|null)=>{
+  const copyCode=async(code:string)=>{
+    try{await navigator.clipboard.writeText(code);return true}catch{return false}
+  };
+
+  const showChallenge=async(next:MicrosoftAuthChallenge,popup?:Window|null)=>{
     setChallenge(next);
+    const copied=await copyCode(next.userCode);
     try{
       if(popup&&!popup.closed)popup.location.replace(next.verificationUri);
     }catch{/* Fallback button remains available in the page. */}
+    return copied;
   };
 
   const add=async()=>{
@@ -39,8 +45,8 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
       setLabel('');
       const next=await waitForChallenge(account.id);
       if(next){
-        showChallenge(next,popup);
-        notify('Microsoft認証画面を開きました。表示されたコードで認証してください。');
+        const copied=await showChallenge(next,popup);
+        notify(copied?'Microsoft認証画面を開き、コードをクリップボードにコピーしました。':'Microsoft認証画面を開きました。コードをコピーして入力してください。');
       }else{
         try{popup?.close()}catch{}
         notify('Accountを追加しました。PendingのSign inを押してください。');
@@ -56,8 +62,9 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
     try{
       const next=await waitForChallenge(accountId);
       if(!next)throw Error('Microsoft認証案内をまだ取得できません。少し待って再試行してください');
-      showChallenge(next,popup);
+      const copied=await showChallenge(next,popup);
       if(!popup||popup.closed)window.open(next.verificationUri,'_blank','noopener,noreferrer');
+      notify(copied?'認証コードをコピーしてMicrosoft画面を開きました':'Microsoft画面を開きました');
     }catch(e){setError(e instanceof Error?e.message:'Microsoft認証画面を開けませんでした')}
     finally{setBusy(false)}
   };
@@ -85,8 +92,8 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
       await client.retryAccount!(accountId);
       const next=await waitForChallenge(accountId);
       if(!next)throw Error('Microsoft認証案内を取得できませんでした');
-      showChallenge(next,popup);
-      notify('Microsoft認証を再開しました');
+      const copied=await showChallenge(next,popup);
+      notify(copied?'Microsoft認証を再開し、コードをコピーしました':'Microsoft認証を再開しました');
     }catch(e){
       try{popup?.close()}catch{}
       setError(e instanceof Error?e.message:'再試行に失敗しました');
@@ -98,7 +105,7 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
     <label className="field-label" htmlFor="remote-account-label">Display label</label>
     <input id="remote-account-label" value={label} maxLength={40} autoComplete="off" onChange={e=>setLabel(e.target.value)} placeholder="Scout_01"/>
     <div className="server-actions"><button className="button accent" disabled={busy||!/^\w[\w-]{0,39}$/.test(label)} onClick={()=>void add()}>Add Microsoft</button></div>
-    {challenge&&<div className="token-note" role="status"><div><strong>Microsoft sign-in</strong><div>Code: <code>{challenge.userCode}</code></div><a className="button outline" href={challenge.verificationUri} target="_blank" rel="noreferrer"><ExternalLink size={15}/> Open Microsoft sign-in</a><small>このコードは認証画面だけで使い、チャットには貼らないでください。</small></div></div>}
+    {challenge&&<div className="token-note" role="status"><div><strong>Microsoft sign-in</strong><div>Code: <code>{challenge.userCode}</code></div><button className="button outline" onClick={()=>void copyCode(challenge.userCode).then(()=>window.open(challenge.verificationUri,'_blank','noopener,noreferrer'))}><ExternalLink size={15}/> Copy code & open Microsoft</button><small>MicrosoftのDevice Code Flowではコードの事前入力はできないため、ここではコードを自動コピーして認証画面を開きます。貼り付けだけ行ってください。</small></div></div>}
     <p className="muted">Session Accountは現在の認証ライブラリで安全なMicrosoftセッション入力経路を確認できないため非対応です。</p>
     {error&&<p role="alert" className="server-error">{error}</p>}
   </div>
