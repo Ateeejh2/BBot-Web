@@ -139,6 +139,10 @@ try {
   assert.ok(remoteAccounts.includes('Add Microsoft')&&remoteAccounts.includes('Scout')&&remoteAccounts.includes('assignment'));
   assert.equal(remoteAccounts.includes('SECRET_REFRESH_TOKEN'),false);
   assert.ok(remoteAccounts.includes('Session'));
+  const sessionErrorSnapshot={...remoteSnapshot,accounts:[{id:'33333333-3333-4333-8333-333333333333',label:'Expired',kind:'SESSION',status:'ERROR',
+    minecraftName:'ExpiredMC',assignedBot:'bot-1',createdAt:0,authError:'SESSION_TOKEN_INVALID'}]};
+  const sessionErrorHtml=renderToString(createElement(RemoteAccountsPanel,{snapshot:sessionErrorSnapshot,notify:()=>{}}));
+  assert.ok(sessionErrorHtml.includes('Authentication failed')&&sessionErrorHtml.includes('Replace Token required')&&sessionErrorHtml.includes('Auth error'));
   const sessionSource=await (await import('node:fs/promises')).readFile('src/RemoteAccountsPanel.tsx','utf8');
   assert.match(sessionSource,/id="session-access-token"[^>]*type="password"[^>]*autoComplete="off"/);
   assert.equal(sessionSource.includes('session-client-token'),false);
@@ -156,12 +160,18 @@ try {
   const requests=[];let wire={version:1,bots:[{id:'bot-1',accountId:'account-1',accountLabel:'Scout',state:'DISCONNECTED'}],
     instances:[],logs:[],viewer:null,accounts:remoteSnapshot.accounts,serverConnection:remoteSnapshot.serverConnection};
   try{
+    let failNextStart=false;
     globalThis.window={location:{href:'http://localhost:5173/'},setInterval:()=>0};
     globalThis.localStorage={setItem:()=>browserWrites++};globalThis.sessionStorage={setItem:()=>browserWrites++};
     globalThis.WebSocket=class{static OPEN=1;constructor(){this.readyState=0}};
     globalThis.fetch=async(path,options={})=>{
       requests.push({path,options});
       if(path==='/api/v1/settings/server'){const result={...JSON.parse(options.body),revision:3};wire={...wire,serverConnection:result};return Response.json(result)}
+      if(path==='/api/v1/bots/bot-1/actions/connect'&&options.method==='POST'&&failNextStart){
+        failNextStart=false;
+        wire={...wire,accounts:wire.accounts.map(a=>a.id===sessionAccountId?{...a,status:'ERROR',authError:'SESSION_TOKEN_INVALID'}:a)};
+        return Response.json({error:'SESSION_AUTH_REQUIRED'},{status:422});
+      }
       if(path==='/api/v1/accounts'&&options.method==='POST'){
         const submitted=JSON.parse(options.body);
         const account={id:submitted.kind==='SESSION'?sessionAccountId:'account-2',label:submitted.label,kind:submitted.kind,
@@ -186,6 +196,12 @@ try {
     assert.equal(submitted.kind,'SESSION');
     const replaced=await remote.replaceSessionToken(submitted.id,'TEST_ACCESS_REPLACED');
     assert.equal(replaced.minecraftName,'SessionRenamed');
+    wire={...wire,bots:wire.bots.map(b=>b.id==='bot-1'?{...b,accountId:sessionAccountId,accountLabel:'SessionRenamed'}:b),
+      accounts:wire.accounts.map(a=>({...a,assignedBot:a.id===sessionAccountId?'bot-1':undefined}))};
+    await remote['refresh']();
+    failNextStart=true;
+    await assert.rejects(()=>remote.startBot('bot-1'),/Session Tokenが無効または期限切れ/);
+    assert.equal(remote.getSnapshot().accounts.find(a=>a.id===sessionAccountId)?.status,'ERROR');
     assert.equal(JSON.stringify(remote.getSnapshot()).includes('TEST_ACCESS'),false);
     assert.equal(JSON.stringify(remote.getSnapshot()).includes('TEST_ACCESS_REPLACED'),false);
     assert.equal(remote.getSnapshot().accounts[1].assignedBot,'bot-1');
