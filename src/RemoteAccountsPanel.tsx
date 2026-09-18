@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { bbotClient as client } from './client';
 import type { Snapshot } from './client/types';
 
@@ -10,10 +11,17 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
     catch(e){setError(e instanceof Error?e.message:'Accountの追加に失敗しました')}
     finally{setBusy(false)}
   };
-  const assign=async(botId:string,accountId:string)=>{
+  const assign=async(botId:string,accountId:string|null)=>{
     setBusy(true);setError('');
-    try {await client.assignAccount!(botId,accountId);notify(`${botId} にAccountを割り当てました`)}
+    try {await client.assignAccount!(botId,accountId);notify(accountId?`${botId} にAccountを割り当てました`:`${botId} のAccount割当を解除しました`)}
     catch(e){setError(e instanceof Error?e.message:'割当に失敗しました')}
+    finally{setBusy(false)}
+  };
+  const remove=async(accountId:string,label:string)=>{
+    if(!window.confirm(`${label} をBBotから削除しますか？\nBotが使用中の場合は削除できません。Microsoft認証キャッシュは残ります。`))return;
+    setBusy(true);setError('');
+    try {await client.deleteAccount!(accountId);notify(`${label} を削除しました`)}
+    catch(e){setError(e instanceof Error?e.message:'Accountの削除に失敗しました')}
     finally{setBusy(false)}
   };
   const retry=async(accountId:string)=>{
@@ -34,13 +42,18 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
   <div className="account-list">{snapshot.accounts.map(account=><div className="account-row" key={account.id}>
     <div className="account-avatar">{account.label.slice(0,1).toUpperCase()}</div>
     <div><strong>{account.label}</strong><span>Microsoft · {account.status} · {account.assignedBot??'Unassigned'}</span></div>
-    {account.status==='ERROR'?<button className="mini" disabled={busy} onClick={()=>void retry(account.id)}>Retry</button>:
-      <span className="account-lock">{account.status==='READY'?'Ready':'Pending'}</span>}
+    <div className="server-actions">
+      {account.status==='ERROR'?<button className="mini" disabled={busy} onClick={()=>void retry(account.id)}>Retry</button>:
+        <span className="account-lock">{account.status==='READY'?'Ready':'Pending'}</span>}
+      <button className="mini" disabled={busy||Boolean(account.assignedBot&&snapshot.bots.find(b=>b.id===account.assignedBot)?.state!=='DISCONNECTED')} onClick={()=>void remove(account.id,account.label)} title={account.assignedBot&&snapshot.bots.find(b=>b.id===account.assignedBot)?.state!=='DISCONNECTED'?'使用中のBotをStopしてから削除してください':'Accountを削除'}>
+        <Trash2 size={14}/> Delete
+      </button>
+    </div>
   </div>)}</div>
   {snapshot.bots.map(bot=><div className="panel" key={bot.id}><h2>{bot.id} Account assignment</h2>
     <p className="muted">{bot.state==='DISCONNECTED'?'停止中にAccountを選択できます。':`現在 ${bot.state}。Stop後に変更できます。`}</p>
     <label className="field-label" htmlFor={`assign-${bot.id}`}>Assigned Account</label>
-    <select id={`assign-${bot.id}`} value={bot.accountId} disabled={busy||bot.state!=='DISCONNECTED'} onChange={e=>{if(e.target.value)void assign(bot.id,e.target.value)}}>
+    <select id={`assign-${bot.id}`} value={bot.accountId} disabled={busy||bot.state!=='DISCONNECTED'} onChange={e=>void assign(bot.id,e.target.value||null)}>
       <option value="">Unassigned</option>
       {snapshot.accounts.filter(a=>a.status==='READY'&&(a.assignedBot===undefined||a.assignedBot===bot.id)).map(a=><option key={a.id} value={a.id}>{a.label}</option>)}
     </select>
