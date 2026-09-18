@@ -54,7 +54,6 @@ function BotCard({bot,compact,onAction,trade,onLiveView}:{bot:Bot;compact?:boole
     {!compact&&<div className="bot-details"><span>Position <b className="mono">{bot.state!=='DISCONNECTED'?`${bot.x.toFixed(1)} / ${bot.y.toFixed(1)} / ${bot.z.toFixed(1)}`:'—'}</b></span><span>Job <b className="mono">{bot.jobId??'—'}</b></span>{bot.kickReason&&<span>Kick <b>{bot.kickReason}</b></span>}</div>}
     <div className="card-actions">
       {!active?<button className="mini primary-mini" onClick={()=>onAction(()=>client.startBot(bot.id))}><Play size={15}/> Start</button>:<button className="mini" onClick={()=>onAction(()=>client.stopBot(bot.id))}><Power size={15}/> Stop</button>}
-      {client.mode==='remote'&&bot.state==='LOBBY'&&<button className="mini primary-mini" onClick={()=>onAction(()=>client.joinPit!(bot.id))}>Join Pit</button>}
       {client.mode==='mock'&&active&&<button className="mini" onClick={()=>onAction(()=>client.recoverBot(bot.id))}><RotateCcw size={15}/> Recover</button>}
       {!compact&&<button className="mini live-view-button" disabled={!active} onClick={()=>onLiveView?.(bot)}><Radio size={15}/> Live View</button>}
       {!compact&&client.mode==='mock'&&<label className="select-wrap"><span className="sr-only">{bot.name} の状態</span><select value={bot.state} onChange={e=>onAction(()=>client.setBotState(bot.id,e.target.value as BotState))} aria-label={`${bot.name} の状態を試す`}>
