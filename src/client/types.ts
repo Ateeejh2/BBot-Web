@@ -10,6 +10,7 @@ export interface Job { id:string; eventType:string; instanceId:string; state:Job
 export interface Account { id:string; label:string; kind:AccountKind; status:'READY'|'UNASSIGNED'|'WAITING_FOR_LOGIN'|'ERROR'; minecraftName?:string; assignedBot?:string; createdAt:number; authError?:'SESSION_TOKEN_INVALID' }
 export interface MicrosoftAuthChallenge { verificationUri:string; userCode:string; expiresAt:number }
 export interface SessionAccountInput { label:string; accessToken:string }
+export interface FleetActionResult { started?:string[]; stopped?:string[]; skipped?:Array<{botId:string;reason:string}> }
 export interface LogEntry { id:number; at:number; level:'INFO'|'WARN'|'ERROR'; message:string; botId?:string; instanceId?:string; jobId?:string }
 export interface Settings { maxBots:number; pathConcurrency:number; eventPollingSeconds:number; debug:boolean; javaVersion:'1.8.9' }
 export type TradeStatus = 'IDLE'|'REQUESTING'|'WAITING_FOR_GUI'|'OPEN'|'CLOSED'|'COMPLETED'|'TIMEOUT'|'ERROR';
@@ -39,6 +40,8 @@ export interface BBotClient {
   warpParty(botId:string):PartyCommandResult|Promise<PartyCommandResult>;
   startBot(id:string):void|Promise<void>;
   stopBot(id:string):void|Promise<void>;
+  startAssignedBots?():Promise<FleetActionResult>;
+  stopAllBots?():Promise<FleetActionResult>;
   joinPit?(id:string):void|Promise<void>;
   recoverBot(id:string):void;
   setBotState(id:string,state:BotState):void;
