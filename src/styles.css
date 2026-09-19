@@ -22,6 +22,12 @@
 @media(max-width:420px){.bot-grid{grid-template-columns:minmax(0,1fr)}.trade-grid{gap:2px}.trade-slot{min-height:32px}.bot-command-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.bot-command-actions .mini:last-child{grid-column:1/-1}}
 @media(max-width:700px){.server-fields{grid-template-columns:1fr;gap:7px}.server-fields input,.server-fields select{margin-bottom:9px}.server-actions .button{flex:1;min-width:135px}}
 
+/* Runtime and pathfinding diagnostics */
+.performance-panel{margin:0 0 16px}.performance-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.performance-metrics>div{background:#132233;border:1px solid #294052;border-radius:11px;padding:13px 14px;min-width:0}.performance-metrics span{display:block;color:#8297aa;font-size:.72rem;font-weight:700}.performance-metrics strong{display:block;color:#e6f0f2;font-family:'Space Grotesk',sans-serif;font-size:1.15rem;margin-top:5px;overflow-wrap:anywhere}.performance-metrics small{display:block;color:#6f879a;font-size:.69rem;margin-top:2px}.path-performance-list{margin-top:13px;border-top:1px solid #2a3d4e}.path-performance-list>div{display:grid;grid-template-columns:minmax(90px,1fr) repeat(3,minmax(110px,1fr));gap:12px;align-items:center;padding:10px 2px;border-bottom:1px solid #243747;font-size:.73rem}.path-performance-list>div:last-child{border-bottom:0}.path-performance-list span{color:#8196a9}.path-performance-list span strong{display:block;color:#cad8df;font-weight:600;margin-top:2px}
+@media(max-width:980px){.performance-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.path-performance-list>div{grid-template-columns:minmax(90px,1fr) repeat(3,minmax(95px,1fr))}}
+@media(max-width:700px){.performance-metrics{grid-template-columns:1fr 1fr}.path-performance-list{overflow-x:auto}.path-performance-list>div{min-width:560px}}
+@media(max-width:385px){.performance-metrics{grid-template-columns:1fr}}
+
 /* Remote manual job form */
 .job-create-panel{margin-top:16px;max-width:920px}.job-create-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:4px 0 16px}.job-create-grid label{display:grid;gap:7px;color:#b6c8d3;font-size:.78rem;font-weight:800}.job-create-grid input,.job-create-grid select{width:100%;min-width:0;min-height:44px;border:1px solid #3a5264;border-radius:9px;background:#101f2f;color:#eaf2f4;padding:9px 11px;font-size:16px}
 @media(max-width:700px){.job-create-grid{grid-template-columns:1fr 1fr}.job-create-grid label:first-child,.job-create-grid label:nth-child(2){grid-column:1/-1}}
