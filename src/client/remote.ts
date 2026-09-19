@@ -2,13 +2,13 @@ import type { BBotClient, BotState, Snapshot, Settings, InstanceStatus, JobStatu
 import { defaultServerConnection, type ServerConnection, type ReconnectResult } from './serverConnection';
 
 type Wire = { version:number; bots:Array<{id:string;accountId?:string;accountLabel:string;minecraftName?:string;state:BotState;startQueued?:boolean;instanceId?:string;jobId?:string;position?:{x:number;y:number;z:number};kickReason?:string;kickedAt?:number}>;
-  instances:Snapshot['instances'];jobs?:Snapshot['jobs'];performance?:Snapshot['performance'];carePackages?:Snapshot['carePackages'];carePackageTracking?:Snapshot['carePackageTracking'];movementDebug?:boolean;logs:Array<{id:number;at:number;level:string;message:string;botId?:string;instanceId?:string;kickReason?:string;detail?:string}>;
+  instances:Snapshot['instances'];jobs?:Snapshot['jobs'];performance?:Snapshot['performance'];carePackages?:Snapshot['carePackages'];carePackageTracking?:Snapshot['carePackageTracking'];movementDebug?:boolean;logs:Array<{id:number;at:number;level:string;message:string;botId?:string;instanceId?:string;kickReason?:string;detail?:string}>;chatLogs?:Snapshot['chatLogs'];
   viewer:{botId:string;url:string}|null;accounts?:Snapshot['accounts'];serverConnection?:Snapshot['serverConnection'] };
 const unsupported = ():never => {throw Error('この操作は実Botではまだ利用できません')};
 const idleTrade = ():TradeState => ({status:'IDLE',tradeSessionId:null,targetUsername:null,revision:0,window:null});
 export class RemoteBBotClient implements BBotClient {
   readonly mode='remote' as const;
-  private current:Snapshot={bots:[],instances:[],jobs:[],accounts:[],logs:[],settings:{maxBots:1,pathConcurrency:2,eventPollingSeconds:10,debug:false,javaVersion:'1.8.9'},serverConnection:defaultServerConnection,trades:{},revision:0,viewer:null,remoteConnected:false};
+  private current:Snapshot={bots:[],instances:[],jobs:[],accounts:[],logs:[],chatLogs:[],settings:{maxBots:1,pathConcurrency:2,eventPollingSeconds:10,debug:false,javaVersion:'1.8.9'},serverConnection:defaultServerConnection,trades:{},revision:0,viewer:null,remoteConnected:false};
   private listeners=new Set<()=>void>();
   private socket?:WebSocket;
   private failures=0;
@@ -26,6 +26,7 @@ export class RemoteBBotClient implements BBotClient {
       bots:data.bots.map(b=>({id:b.id,accountId:b.accountId??'',name:b.minecraftName??b.accountLabel,state:b.state,startQueued:b.startQueued,instanceId:b.instanceId,jobId:b.jobId,
         x:b.position?.x??0,y:b.position?.y??0,z:b.position?.z??0,updatedAt:Date.now(),kickReason:b.kickReason??kicks.get(b.id),kickedAt:b.kickedAt})),
       accounts:data.accounts??[],
+      chatLogs:data.chatLogs??[],
       logs:data.logs.map(l=>({id:l.id,at:l.at,level:l.level==='WARN'?'WARN' as const:l.level==='ERROR'?'ERROR' as const:'INFO' as const,
         message:l.kickReason?`${l.message}: ${l.kickReason}`:l.detail?`${l.message}: ${l.detail}`:l.message,botId:l.botId,instanceId:l.instanceId}))};
     this.listeners.forEach(listener=>listener());
