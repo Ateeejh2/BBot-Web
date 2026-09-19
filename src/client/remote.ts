@@ -38,7 +38,7 @@ export class RemoteBBotClient implements BBotClient {
     socket.onopen=()=>{this.failures=0;this.connected(true)};
     socket.onclose=()=>{if(this.socket!==socket)return;void this.refresh().then(ok=>{if(!ok)this.connected(false)});setTimeout(()=>{this.open()},Math.min(1000*2**this.failures++,10000))};
   }
-  private async action(id:string,name:'connect'|'join-pit'|'disconnect'){
+  private async action(id:string,name:'connect'|'join-pit'|'disconnect'|'test-launch-pad'){
     if(!/^bot-[1-9]\d*$/.test(id))throw Error('無効なBot IDです');
     const r=await fetch(`/api/v1/bots/${id}/actions/${name}`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',credentials:'same-origin'});
     const data=await r.json().catch(()=>null) as (Wire|{error?:string}|null);
@@ -81,6 +81,7 @@ export class RemoteBBotClient implements BBotClient {
     return data as FleetActionResult;
   }
   joinPit(id:string){return this.action(id,'join-pit')}
+  testLaunchPad(id:string){return this.action(id,'test-launch-pad')}
   getServerConnection=()=>this.current.serverConnection;
   private async request(path:string,method:'POST'|'PUT',body:object){
     const r=await fetch(path,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body),credentials:'same-origin'});
