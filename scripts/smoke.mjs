@@ -159,14 +159,14 @@ try {
   assert.match(sessionSource,/disabled=\{busy\|\|bot\.state!==\'DISCONNECTED\'\|\|Boolean\(bot\.startQueued\)\}/);
   const appSource=await (await import('node:fs/promises')).readFile('src/App.tsx','utf8');
   assert.ok(appSource.includes('Submit Job')&&appSource.includes('client.submitJob!'));
-  assert.ok(appSource.includes('Process CPU')&&appSource.includes('Event loop p99')&&appSource.includes('Path slots'));
+  assert.ok(appSource.includes('Process CPU')&&appSource.includes('Event loop p99')&&appSource.includes('MC server ping')&&appSource.includes('Path slots'));
   const { RemoteBBotClient } = await server.ssrLoadModule('/src/client/remote.ts');
   const oldWindow=globalThis.window,oldSocket=globalThis.WebSocket,oldFetch=globalThis.fetch;
   const oldLocalStorage=globalThis.localStorage,oldSessionStorage=globalThis.sessionStorage;
   let browserWrites=0;
   const sessionAccountId='33333333-3333-4333-8333-333333333333';
   const requests=[];let wire={version:1,bots:[{id:'bot-1',accountId:'account-1',accountLabel:'Scout',state:'DISCONNECTED'}],
-    instances:[{id:'mega-a',status:'ACTIVE',firstSeen:0,lastSeen:0}],jobs:[],performance:{runtime:{cpuPercent:12.5,rssMb:128,heapUsedMb:64,heapTotalMb:96,eventLoopMeanMs:2,eventLoopP99Ms:4,eventLoopMaxMs:7,uptimeSeconds:10},pathfinding:{active:0,queued:0,concurrency:2,bots:[{botId:'bot-1',pathAttempts:1,pathCompleted:1,pathFailed:0,lastPathMs:250,lastPathQueueMs:3}]}},logs:[],viewer:null,accounts:remoteSnapshot.accounts,serverConnection:remoteSnapshot.serverConnection};
+    instances:[{id:'mega-a',status:'ACTIVE',firstSeen:0,lastSeen:0}],jobs:[],performance:{runtime:{cpuPercent:12.5,rssMb:128,heapUsedMb:64,heapTotalMb:96,eventLoopMeanMs:2,eventLoopP99Ms:4,eventLoopMaxMs:7,uptimeSeconds:10},pathfinding:{active:0,queued:0,concurrency:2,bots:[{botId:'bot-1',pingMs:87,pathAttempts:1,pathCompleted:1,pathFailed:0,lastPathMs:250,lastPathQueueMs:3}]}},logs:[],viewer:null,accounts:remoteSnapshot.accounts,serverConnection:remoteSnapshot.serverConnection};
   try{
     let failNextStart=false;
     globalThis.window={location:{href:'http://localhost:5173/'},setInterval:()=>0};
@@ -202,7 +202,7 @@ try {
     const remote=new RemoteBBotClient();await new Promise(resolve=>setTimeout(resolve,0));
     assert.equal(remote.getServerConnection().host,'play.example.com');
     assert.equal(remote.getSnapshot().performance?.runtime.cpuPercent,12.5);
-    assert.equal(remote.getSnapshot().performance?.pathfinding.bots[0]?.lastPathMs,250);
+    assert.equal(remote.getSnapshot().performance?.pathfinding.bots[0]?.pingMs,87);\n    assert.equal(remote.getSnapshot().performance?.pathfinding.bots[0]?.lastPathMs,250);
     assert.equal((await remote.saveServerConnection({host:'next.example',port:25565,version:'1.8.9'})).revision,3);
     assert.deepEqual((await remote.startAssignedBots()).started,['bot-1']);
     assert.deepEqual((await remote.stopAllBots()).stopped,['bot-1']);
