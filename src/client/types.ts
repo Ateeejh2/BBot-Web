@@ -29,7 +29,7 @@ export const validMinecraftUsername = (value:string):boolean => /^[A-Za-z0-9_]{1
 export const canSendMinecraftCommand = (state:BotState):boolean => ['LOBBY','IN_PIT_IDLE','PATHFINDING','WORKING'].includes(state);
 export const isConnectedBot = (state:BotState):boolean => ['LOBBY','JOINING_PIT','IN_PIT_IDLE','PREPARING_EVENT','PATHFINDING','WORKING'].includes(state);
 export interface PartyCommandResult { status:'SENT'|'REJECTED'; message:string; serverMessage?:string }
-export interface Snapshot { bots:Bot[]; instances:Instance[]; jobs:Job[]; accounts:Account[]; logs:LogEntry[]; settings:Settings; serverConnection:ServerConnectionRecord; trades:Record<string,TradeState>; revision:number; performance?:PerformanceSnapshot; carePackages?:CarePackageSchedule; carePackageTracking?:CarePackageTracking; viewer?:{botId:string;url:string}|null; remoteConnected?:boolean }
+export interface Snapshot { bots:Bot[]; instances:Instance[]; jobs:Job[]; accounts:Account[]; logs:LogEntry[]; settings:Settings; serverConnection:ServerConnectionRecord; trades:Record<string,TradeState>; revision:number; performance?:PerformanceSnapshot; carePackages?:CarePackageSchedule; carePackageTracking?:CarePackageTracking; movementDebug?:boolean; viewer?:{botId:string;url:string}|null; remoteConnected?:boolean }
 export interface BBotClient {
   readonly mode:'mock'|'remote';
   getSnapshot():Snapshot;
@@ -51,6 +51,7 @@ export interface BBotClient {
   stopAllBots?():Promise<FleetActionResult>;
   joinPit?(id:string):void|Promise<void>;
   testLaunchPad?(id:string):void|Promise<void>;
+  setMovementDebug?(enabled:boolean):Promise<void>;
   recoverBot(id:string):void;
   setBotState(id:string,state:BotState):void;
   createBots(count:number):void;
