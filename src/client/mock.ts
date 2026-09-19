@@ -29,6 +29,10 @@ const initial = ():Snapshot => ({
     {id:3,at:stamp-6300,level:'INFO',message:'Job を割り当てました',botId:'bot-02',instanceId:'mini02',jobId:'job-021'},
     {id:4,at:stamp-4000,level:'WARN',message:'Instance の状態を SUSPECT に変更しました',instanceId:'mega03a'},
   ],
+  chatLogs:[
+    {id:1,at:stamp-5400,botId:'bot-01',instanceId:'mega10c',channel:'chat',text:'[Mock] Welcome to the server!'},
+    {id:2,at:stamp-3100,botId:'bot-04',channel:'system',text:'[Mock] SERVER FOUND! Sending to mini02...'}
+  ],
   settings:{maxBots:20,pathConcurrency:2,eventPollingSeconds:10,debug:false,javaVersion:'1.8.9'},serverConnection:{...defaultServerConnection},trades:{},revision:0
 });
 export const MOCK_CONNECTION_SPACING_MS = 120;
