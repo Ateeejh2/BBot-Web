@@ -1,5 +1,5 @@
 import type { ReconnectResult, ServerConnection, ServerConnectionRecord } from './serverConnection';
-export const botStates = ['DISCONNECTED','CONNECTING','LOBBY','JOINING_PIT','IN_PIT_IDLE','PATHFINDING','WORKING','RECOVERING'] as const;
+export const botStates = ['DISCONNECTED','CONNECTING','LOBBY','JOINING_PIT','IN_PIT_IDLE','PREPARING_EVENT','PATHFINDING','WORKING','RECOVERING'] as const;
 export type BotState = typeof botStates[number];
 export type InstanceStatus = 'ACTIVE' | 'SUSPECT' | 'INACTIVE';
 export type JobStatus = 'QUEUED' | 'ASSIGNED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
@@ -13,6 +13,7 @@ export interface RuntimePerformance { cpuPercent:number; rssMb:number; heapUsedM
 export interface BotPathPerformance { botId:string; pingMs?:number; pathAttempts:number; pathCompleted:number; pathFailed:number; activePathMs?:number; lastPathMs?:number; lastPathQueueMs?:number }
 export interface PerformanceSnapshot { runtime:RuntimePerformance; pathfinding:{active:number;queued:number;concurrency:number;bots:BotPathPerformance[]} }
 export interface CarePackageSchedule { source:'brookeafk.com'; sourceUrl:string; updatedAt?:number; status:'OK'|'STALE'|'UNAVAILABLE'; events:Array<{timestamp:number}> }
+export interface CarePackageTracking { timestamp?:number; instances:Array<{instanceId:string;state:'ARMED'|'CARRIER_DETECTED'|'LAUNCHING'|'DROPPED'|'CHEST_DETECTED'|'LAUNCH_FAILED';target?:{x:number;y:number;z:number}}> }
 export interface Account { id:string; label:string; kind:AccountKind; status:'READY'|'UNASSIGNED'|'WAITING_FOR_LOGIN'|'ERROR'; minecraftName?:string; assignedBot?:string; createdAt:number; authError?:'SESSION_TOKEN_INVALID' }
 export interface MicrosoftAuthChallenge { verificationUri:string; userCode:string; expiresAt:number }
 export interface SessionAccountInput { label:string; accessToken:string }
@@ -26,9 +27,9 @@ export interface TradeState { status:TradeStatus; tradeSessionId:string|null; ta
 export interface TradeClickRequest { tradeSessionId:string; windowId:number; slot:number; revision:number }
 export const validMinecraftUsername = (value:string):boolean => /^[A-Za-z0-9_]{1,16}$/.test(value);
 export const canSendMinecraftCommand = (state:BotState):boolean => ['LOBBY','IN_PIT_IDLE','PATHFINDING','WORKING'].includes(state);
-export const isConnectedBot = (state:BotState):boolean => ['LOBBY','JOINING_PIT','IN_PIT_IDLE','PATHFINDING','WORKING'].includes(state);
+export const isConnectedBot = (state:BotState):boolean => ['LOBBY','JOINING_PIT','IN_PIT_IDLE','PREPARING_EVENT','PATHFINDING','WORKING'].includes(state);
 export interface PartyCommandResult { status:'SENT'|'REJECTED'; message:string; serverMessage?:string }
-export interface Snapshot { bots:Bot[]; instances:Instance[]; jobs:Job[]; accounts:Account[]; logs:LogEntry[]; settings:Settings; serverConnection:ServerConnectionRecord; trades:Record<string,TradeState>; revision:number; performance?:PerformanceSnapshot; carePackages?:CarePackageSchedule; viewer?:{botId:string;url:string}|null; remoteConnected?:boolean }
+export interface Snapshot { bots:Bot[]; instances:Instance[]; jobs:Job[]; accounts:Account[]; logs:LogEntry[]; settings:Settings; serverConnection:ServerConnectionRecord; trades:Record<string,TradeState>; revision:number; performance?:PerformanceSnapshot; carePackages?:CarePackageSchedule; carePackageTracking?:CarePackageTracking; viewer?:{botId:string;url:string}|null; remoteConnected?:boolean }
 export interface BBotClient {
   readonly mode:'mock'|'remote';
   getSnapshot():Snapshot;
