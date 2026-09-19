@@ -12,8 +12,8 @@ const nav:{id:Page;label:string;icon:typeof LayoutDashboard}[] = [
   {id:'accounts',label:'Accounts',icon:Users},{id:'settings',label:'Settings',icon:Settings2},
   {id:'logs',label:'Logs',icon:ScrollText}
 ];
-const short:Record<BotState,string> = {DISCONNECTED:'Offline',CONNECTING:'Connecting',LOBBY:'Lobby',JOINING_PIT:'Joining Pit',IN_PIT_IDLE:'Idle',PATHFINDING:'Pathfinding',WORKING:'Working',RECOVERING:'Recovering'};
-const tone=(s:string)=> ['IN_PIT_IDLE','ACTIVE','READY','COMPLETED'].includes(s)?'good':['PATHFINDING','WORKING','RUNNING','ASSIGNED'].includes(s)?'teal':['SUSPECT','RECOVERING','CONNECTING','JOINING_PIT','QUEUED'].includes(s)?'amber':['FAILED','EXPIRED'].includes(s)?'red':'quiet';
+const short:Record<BotState,string> = {DISCONNECTED:'Offline',CONNECTING:'Connecting',LOBBY:'Lobby',JOINING_PIT:'Joining Pit',IN_PIT_IDLE:'Idle',PREPARING_EVENT:'Preparing Event',PATHFINDING:'Pathfinding',WORKING:'Working',RECOVERING:'Recovering'};
+const tone=(s:string)=> ['IN_PIT_IDLE','ACTIVE','READY','COMPLETED','DROPPED','CHEST_DETECTED'].includes(s)?'good':['PREPARING_EVENT','PATHFINDING','WORKING','RUNNING','ASSIGNED','CARRIER_DETECTED','LAUNCHING'].includes(s)?'teal':['SUSPECT','RECOVERING','CONNECTING','JOINING_PIT','QUEUED','ARMED'].includes(s)?'amber':['FAILED','EXPIRED','LAUNCH_FAILED'].includes(s)?'red':'quiet';
 const rel=(time:number)=>{const m=Math.max(0,Math.floor((Date.now()-time)/60000));return m<1?'たった今':m<60?`${m}分前`:m<1440?`${Math.floor(m/60)}時間前`:`${Math.floor(m/1440)}日前`};
 const retryText=(retryAt?:number)=>retryAt===undefined?'—':retryAt<=Date.now()?'Ready':`${Math.max(1,Math.ceil((retryAt-Date.now())/1000))}s`;
 const eventCountdown=(timestamp:number)=>{const seconds=Math.max(0,Math.ceil((timestamp-Date.now())/1000));if(seconds<60)return `${seconds}s`;const minutes=Math.floor(seconds/60);if(minutes<60)return `${minutes}m ${seconds%60}s`;const hours=Math.floor(minutes/60);return `${hours}h ${minutes%60}m`};
@@ -95,7 +95,7 @@ function App(){
   const perform=(task:()=>void|Promise<void>,success='操作を送信しました')=>{void Promise.resolve().then(task).then(()=>setToast(success)).catch(err=>setToast(err instanceof Error?err.message:'操作に失敗しました'))};
   const active=snapshot.bots.filter(b=>b.state!=='DISCONNECTED').length;
   const assignedReadyOffline=snapshot.bots.filter(b=>b.state==='DISCONNECTED'&&!b.startQueued&&snapshot.accounts.some(a=>a.assignedBot===b.id&&a.status==='READY')).length;
-  const live=snapshot.bots.filter(b=>['IN_PIT_IDLE','PATHFINDING','WORKING'].includes(b.state)).length;
+  const live=snapshot.bots.filter(b=>['IN_PIT_IDLE','PREPARING_EVENT','PATHFINDING','WORKING'].includes(b.state)).length;
   const pending=snapshot.jobs.filter(j=>['QUEUED','ASSIGNED','RUNNING'].includes(j.state)).length;
   const current=nav.find(n=>n.id===page)!;
   return <div className="app-shell">
@@ -161,12 +161,15 @@ function App(){
     {toast&&<div className="toast" role="status"><Check size={16}/>{toast}</div>}
   </div>
 }
-function CarePackagePanel({schedule}:{schedule:NonNullable<Snapshot['carePackages']>}){
+function CarePackagePanel({schedule,tracking}:{schedule:NonNullable<Snapshot['carePackages']>;tracking?:Snapshot['carePackageTracking']}){
   return <section className="panel care-package-panel"><SectionHead kicker="PIT EVENTS" title="Next Care Packages" action={<a className="link" href={schedule.sourceUrl} target="_blank" rel="noreferrer">brookeafk.com <ArrowRight size={15}/></a>}/>
     <div className="care-package-meta"><span className={`source-state ${schedule.status.toLowerCase()}`}>{schedule.status}</span><span>{schedule.updatedAt?`Updated ${rel(schedule.updatedAt)}`:'Waiting for first update'}</span></div>
     {schedule.events.length?<div className="care-package-list">{schedule.events.map((event,index)=><div className="care-package-row" key={event.timestamp}>
       <span className="care-package-icon"><Package size={17}/></span><span className="care-package-rank">#{index+1}</span><div><strong>Care Package</strong><small>{eventClock(event.timestamp)}</small></div><b className="care-package-countdown">{eventCountdown(event.timestamp)}</b>
     </div>)}</div>:<p className="care-package-empty">{schedule.status==='UNAVAILABLE'?'イベント情報を取得できていません。':'今後のCare Packageが見つかりません。'}</p>}
+    {tracking?.timestamp&&<div className="care-tracking"><div className="care-tracking-head"><span>LIVE TRACKING</span><b>{eventClock(tracking.timestamp)}</b></div>
+      {tracking.instances.length?tracking.instances.map(item=><div className="care-tracking-row" key={item.instanceId}><span className="mono">{item.instanceId}</span><Badge status={item.state}/><small>{item.target?`${item.target.x.toFixed(1)} / ${item.target.z.toFixed(1)}`:'waiting'}</small></div>):<small className="care-tracking-wait">Carrier/chest signalを待っています。</small>}
+    </div>}
   </section>
 }
 function Dashboard({data,active,live,pending,go,perform}:{data:Snapshot;active:number;live:number;pending:number;go:(p:Page)=>void;perform:(task:()=>void,success?:string)=>void}){
@@ -175,7 +178,7 @@ function Dashboard({data,active,live,pending,go,perform}:{data:Snapshot;active:n
   const pings=perf?.pathfinding.bots.map(p=>p.pingMs).filter((v):v is number=>v!==undefined)||[],averagePing=pings.length?Math.round(pings.reduce((a,b)=>a+b,0)/pings.length):undefined;
   return <div className="dashboard"><div className="hero-status"><div className="hero-icon"><Activity size={22}/></div><div><div className="eyebrow">FLEET STATUS</div><strong>{active} of {data.bots.length} bots online</strong><p>Java 1.8.9 <span className="bullet">·</span> {client.mode==='remote'?'Live backend':'Mock data'}</p></div><span className="hero-wave" aria-hidden="true"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></span></div>
     <div className="metrics"><div className="metric"><div className="metric-label"><BotIcon size={17}/> BOTS</div><strong>{active}<span> / {data.settings.maxBots}</span></strong><small>{live} in Pit</small></div><div className="metric"><div className="metric-label"><Layers3 size={17}/> INSTANCES</div><strong>{data.instances.length}</strong><small>{suspect?`${suspect} need attention`:'All observed'}</small></div><div className="metric"><div className="metric-label"><ListChecks size={17}/> OPEN JOBS</div><strong>{pending}</strong><small>{data.jobs.filter(j=>j.state==='RUNNING').length} running</small></div></div>
-    {data.carePackages&&<CarePackagePanel schedule={data.carePackages}/>}
+    {data.carePackages&&<CarePackagePanel schedule={data.carePackages} tracking={data.carePackageTracking}/>}
     {perf&&<section className="panel performance-panel"><SectionHead kicker="DIAGNOSTICS" title="Performance"/><div className="performance-metrics">
       <div><span>Process CPU</span><strong>{perf.runtime.cpuPercent.toFixed(1)}%</strong></div>
       <div><span>RSS memory</span><strong>{perf.runtime.rssMb.toFixed(1)} MB</strong></div>
