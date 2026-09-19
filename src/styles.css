@@ -22,6 +22,11 @@
 @media(max-width:420px){.bot-grid{grid-template-columns:minmax(0,1fr)}.trade-grid{gap:2px}.trade-slot{min-height:32px}.bot-command-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.bot-command-actions .mini:last-child{grid-column:1/-1}}
 @media(max-width:700px){.server-fields{grid-template-columns:1fr;gap:7px}.server-fields input,.server-fields select{margin-bottom:9px}.server-actions .button{flex:1;min-width:135px}}
 
+/* Remote manual job form */
+.job-create-panel{margin-top:16px;max-width:920px}.job-create-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:4px 0 16px}.job-create-grid label{display:grid;gap:7px;color:#b6c8d3;font-size:.78rem;font-weight:800}.job-create-grid input,.job-create-grid select{width:100%;min-width:0;min-height:44px;border:1px solid #3a5264;border-radius:9px;background:#101f2f;color:#eaf2f4;padding:9px 11px;font-size:16px}
+@media(max-width:700px){.job-create-grid{grid-template-columns:1fr 1fr}.job-create-grid label:first-child,.job-create-grid label:nth-child(2){grid-column:1/-1}}
+@media(max-width:420px){.job-create-grid{grid-template-columns:1fr}.job-create-grid label{grid-column:1!important}}
+
 /* Embedded Minecraft bot viewer */
 .live-view-button{border-color:#315866;color:#a8e8f1}
 .live-overlay{align-items:center;justify-content:center;padding:24px}
