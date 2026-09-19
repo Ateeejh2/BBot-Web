@@ -159,6 +159,7 @@ try {
   assert.match(sessionSource,/disabled=\{busy\|\|bot\.state!==\'DISCONNECTED\'\|\|Boolean\(bot\.startQueued\)\}/);
   const appSource=await (await import('node:fs/promises')).readFile('src/App.tsx','utf8');
   assert.ok(appSource.includes('Submit Job')&&appSource.includes('client.submitJob!'));
+  assert.ok(appSource.includes('Attempts')&&appSource.includes('Last failure')&&appSource.includes('Retry'));
   assert.ok(appSource.includes('Process CPU')&&appSource.includes('Event loop p99')&&appSource.includes('MC server ping')&&appSource.includes('Path slots'));
   const { RemoteBBotClient } = await server.ssrLoadModule('/src/client/remote.ts');
   const oldWindow=globalThis.window,oldSocket=globalThis.WebSocket,oldFetch=globalThis.fetch;
@@ -177,7 +178,7 @@ try {
       if(path==='/api/v1/settings/server'){const result={...JSON.parse(options.body),revision:3};wire={...wire,serverConnection:result};return Response.json(result)}
       if(path==='/api/v1/fleet/actions/start-assigned'&&options.method==='POST')return Response.json({started:['bot-1'],skipped:[]})
       if(path==='/api/v1/fleet/actions/stop-all'&&options.method==='POST')return Response.json({stopped:['bot-1']})
-      if(path==='/api/v1/jobs'&&options.method==='POST'){const submitted=JSON.parse(options.body);const job={id:'manual-test',eventType:submitted.eventType,instanceId:submitted.instanceId,state:'QUEUED',x:submitted.target.x,y:submitted.target.y,z:submitted.target.z,expiresAt:submitted.expiresAt};wire={...wire,jobs:[job]};return Response.json(job,{status:201})}
+      if(path==='/api/v1/jobs'&&options.method==='POST'){const submitted=JSON.parse(options.body);const job={id:'manual-test',eventType:submitted.eventType,instanceId:submitted.instanceId,state:'QUEUED',x:submitted.target.x,y:submitted.target.y,z:submitted.target.z,expiresAt:submitted.expiresAt,attempts:1,maxAttempts:3,lastFailure:'PATH_NOT_FOUND',lastFailureAt:Date.now(),retryAt:Date.now()+5000};wire={...wire,jobs:[job]};return Response.json(job,{status:201})}
       if(path==='/api/v1/bots/bot-1/actions/connect'&&options.method==='POST'&&failNextStart){
         failNextStart=false;
         wire={...wire,accounts:wire.accounts.map(a=>a.id===sessionAccountId?{...a,status:'ERROR',authError:'SESSION_TOKEN_INVALID'}:a)};
@@ -208,7 +209,8 @@ try {
     assert.deepEqual((await remote.startAssignedBots()).started,['bot-1']);
     assert.deepEqual((await remote.stopAllBots()).stopped,['bot-1']);
     const manualJob=await remote.submitJob({instanceId:'mega-a',eventType:'manual.test',target:{x:1,y:64,z:-2},expiresAt:Date.now()+60000});
-    assert.equal(manualJob.id,'manual-test');assert.equal(remote.getSnapshot().jobs[0]?.instanceId,'mega-a');
+    assert.equal(manualJob.id,'manual-test');assert.equal(manualJob.maxAttempts,3);assert.equal(manualJob.lastFailure,'PATH_NOT_FOUND');
+    assert.equal(remote.getSnapshot().jobs[0]?.instanceId,'mega-a');assert.equal(remote.getSnapshot().jobs[0]?.retryAt!==undefined,true);
     await remote.addMicrosoftAccount('Second');await remote.assignAccount('bot-1','account-2');
     const submitted=await remote.addSessionAccount({label:'Session',accessToken:'TEST_ACCESS'});
     assert.equal(submitted.kind,'SESSION');
