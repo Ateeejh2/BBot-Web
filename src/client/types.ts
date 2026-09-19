@@ -19,6 +19,7 @@ export interface MicrosoftAuthChallenge { verificationUri:string; userCode:strin
 export interface SessionAccountInput { label:string; accessToken:string }
 export interface FleetActionResult { started?:string[]; stopped?:string[]; skipped?:Array<{botId:string;reason:string}> }
 export interface LogEntry { id:number; at:number; level:'INFO'|'WARN'|'ERROR'; message:string; botId?:string; instanceId?:string; jobId?:string }
+export interface ChatLogEntry { id:number; at:number; botId:string; instanceId?:string; channel:string; text:string }
 export interface Settings { maxBots:number; pathConcurrency:number; eventPollingSeconds:number; debug:boolean; javaVersion:'1.8.9' }
 export type TradeStatus = 'IDLE'|'REQUESTING'|'WAITING_FOR_GUI'|'OPEN'|'CLOSED'|'COMPLETED'|'TIMEOUT'|'ERROR';
 export interface TradeItem { name:string; count:number; icon?:string; lore?:string[]; enchantments?:string[]; durability?:number; metadata?:number }
@@ -29,7 +30,7 @@ export const validMinecraftUsername = (value:string):boolean => /^[A-Za-z0-9_]{1
 export const canSendMinecraftCommand = (state:BotState):boolean => ['LOBBY','IN_PIT_IDLE','PATHFINDING','WORKING'].includes(state);
 export const isConnectedBot = (state:BotState):boolean => ['LOBBY','JOINING_PIT','IN_PIT_IDLE','PREPARING_EVENT','PATHFINDING','WORKING'].includes(state);
 export interface PartyCommandResult { status:'SENT'|'REJECTED'; message:string; serverMessage?:string }
-export interface Snapshot { bots:Bot[]; instances:Instance[]; jobs:Job[]; accounts:Account[]; logs:LogEntry[]; settings:Settings; serverConnection:ServerConnectionRecord; trades:Record<string,TradeState>; revision:number; performance?:PerformanceSnapshot; carePackages?:CarePackageSchedule; carePackageTracking?:CarePackageTracking; movementDebug?:boolean; viewer?:{botId:string;url:string}|null; remoteConnected?:boolean }
+export interface Snapshot { bots:Bot[]; instances:Instance[]; jobs:Job[]; accounts:Account[]; logs:LogEntry[]; chatLogs:ChatLogEntry[]; settings:Settings; serverConnection:ServerConnectionRecord; trades:Record<string,TradeState>; revision:number; performance?:PerformanceSnapshot; carePackages?:CarePackageSchedule; carePackageTracking?:CarePackageTracking; movementDebug?:boolean; viewer?:{botId:string;url:string}|null; remoteConnected?:boolean }
 export interface BBotClient {
   readonly mode:'mock'|'remote';
   getSnapshot():Snapshot;
