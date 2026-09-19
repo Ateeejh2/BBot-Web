@@ -13,7 +13,7 @@ export interface RuntimePerformance { cpuPercent:number; rssMb:number; heapUsedM
 export interface BotPathPerformance { botId:string; pingMs?:number; pathAttempts:number; pathCompleted:number; pathFailed:number; activePathMs?:number; lastPathMs?:number; lastPathQueueMs?:number }
 export interface PerformanceSnapshot { runtime:RuntimePerformance; pathfinding:{active:number;queued:number;concurrency:number;bots:BotPathPerformance[]} }
 export interface CarePackageSchedule { source:'brookeafk.com'; sourceUrl:string; updatedAt?:number; status:'OK'|'STALE'|'UNAVAILABLE'; events:Array<{timestamp:number}> }
-export interface CarePackageTracking { timestamp?:number; instances:Array<{instanceId:string;state:'ARMED'|'CARRIER_DETECTED'|'LAUNCHING'|'DROPPED'|'CHEST_DETECTED'|'LAUNCH_FAILED';target?:{x:number;y:number;z:number}}> }
+export interface CarePackageTracking { timestamp?:number; instances:Array<{instanceId:string;state:'ARMED'|'STARTED'|'CARRIER_DETECTED'|'LAUNCHING'|'DROPPED'|'CHEST_DETECTED'|'LAUNCH_FAILED';startedAt?:number;area?:string;target?:{x:number;y:number;z:number}}> }
 export interface Account { id:string; label:string; kind:AccountKind; status:'READY'|'UNASSIGNED'|'WAITING_FOR_LOGIN'|'ERROR'; minecraftName?:string; assignedBot?:string; createdAt:number; authError?:'SESSION_TOKEN_INVALID' }
 export interface MicrosoftAuthChallenge { verificationUri:string; userCode:string; expiresAt:number }
 export interface SessionAccountInput { label:string; accessToken:string }
@@ -51,6 +51,7 @@ export interface BBotClient {
   stopAllBots?():Promise<FleetActionResult>;
   joinPit?(id:string):void|Promise<void>;
   testLaunchPad?(id:string):void|Promise<void>;
+  testCarePackage?(id:string):void|Promise<void>;
   setMovementDebug?(enabled:boolean):Promise<void>;
   recoverBot(id:string):void;
   setBotState(id:string,state:BotState):void;
