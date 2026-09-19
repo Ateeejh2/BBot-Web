@@ -13,7 +13,7 @@ const nav:{id:Page;label:string;icon:typeof LayoutDashboard}[] = [
   {id:'logs',label:'Logs',icon:ScrollText}
 ];
 const short:Record<BotState,string> = {DISCONNECTED:'Offline',CONNECTING:'Connecting',LOBBY:'Lobby',JOINING_PIT:'Joining Pit',IN_PIT_IDLE:'Idle',PREPARING_EVENT:'Preparing Event',PATHFINDING:'Pathfinding',WORKING:'Working',RECOVERING:'Recovering'};
-const tone=(s:string)=> ['IN_PIT_IDLE','ACTIVE','READY','COMPLETED','DROPPED','CHEST_DETECTED'].includes(s)?'good':['PREPARING_EVENT','PATHFINDING','WORKING','RUNNING','ASSIGNED','CARRIER_DETECTED','LAUNCHING'].includes(s)?'teal':['SUSPECT','RECOVERING','CONNECTING','JOINING_PIT','QUEUED','ARMED'].includes(s)?'amber':['FAILED','EXPIRED','LAUNCH_FAILED'].includes(s)?'red':'quiet';
+const tone=(s:string)=> ['IN_PIT_IDLE','ACTIVE','READY','COMPLETED','DROPPED','CHEST_DETECTED'].includes(s)?'good':['PREPARING_EVENT','PATHFINDING','WORKING','RUNNING','ASSIGNED','STARTED','CARRIER_DETECTED','LAUNCHING'].includes(s)?'teal':['SUSPECT','RECOVERING','CONNECTING','JOINING_PIT','QUEUED','ARMED'].includes(s)?'amber':['FAILED','EXPIRED','LAUNCH_FAILED'].includes(s)?'red':'quiet';
 const rel=(time:number)=>{const m=Math.max(0,Math.floor((Date.now()-time)/60000));return m<1?'たった今':m<60?`${m}分前`:m<1440?`${Math.floor(m/60)}時間前`:`${Math.floor(m/1440)}日前`};
 const retryText=(retryAt?:number)=>retryAt===undefined?'—':retryAt<=Date.now()?'Ready':`${Math.max(1,Math.ceil((retryAt-Date.now())/1000))}s`;
 const eventCountdown=(timestamp:number)=>{const seconds=Math.max(0,Math.ceil((timestamp-Date.now())/1000));if(seconds<60)return `${seconds}s`;const minutes=Math.floor(seconds/60);if(minutes<60)return `${minutes}m ${seconds%60}s`;const hours=Math.floor(minutes/60);return `${hours}h ${minutes%60}m`};
@@ -63,6 +63,7 @@ function BotCard({bot,compact,onAction,trade,onLiveView}:{bot:Bot;compact?:boole
       {!active?<button className="mini primary-mini" onClick={()=>onAction(()=>client.startBot(bot.id))}><Play size={15}/> Start</button>:<button className="mini" onClick={()=>onAction(()=>client.stopBot(bot.id))}><Power size={15}/> Stop</button>}
       {client.mode==='mock'&&active&&<button className="mini" onClick={()=>onAction(()=>client.recoverBot(bot.id))}><RotateCcw size={15}/> Recover</button>}
       {client.mode==='remote'&&bot.state==='IN_PIT_IDLE'&&<button className="mini launch-test-button" onClick={()=>onAction(()=>client.testLaunchPad!(bot.id))}><ArrowRight size={15}/> Test Launch Pad</button>}
+      {client.mode==='remote'&&bot.state==='IN_PIT_IDLE'&&<button className="mini" onClick={()=>onAction(()=>client.testCarePackage!(bot.id))}><Package size={15}/> Test Care Package</button>}
       {!compact&&<button className="mini live-view-button" disabled={!active} onClick={()=>onLiveView?.(bot)}><Radio size={15}/> Live View</button>}
       {!compact&&client.mode==='mock'&&<label className="select-wrap"><span className="sr-only">{bot.name} の状態</span><select value={bot.state} onChange={e=>onAction(()=>client.setBotState(bot.id,e.target.value as BotState))} aria-label={`${bot.name} の状態を試す`}>
         {botStates.map(s=><option key={s} value={s}>{s}</option>)}</select><ChevronDown size={13}/></label>}
