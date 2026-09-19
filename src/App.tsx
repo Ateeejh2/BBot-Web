@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { Activity, AlertTriangle, ArrowRight, Bot as BotIcon, Check, ChevronDown, ChevronRight, CircleHelp, Database, LayoutDashboard, Layers3, ListChecks, MoreHorizontal, Play, Plus, Power, Radio, RotateCcw, ScrollText, Search, Settings2, ShieldCheck, Users, X } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowRight, Bot as BotIcon, Check, ChevronDown, ChevronRight, CircleHelp, Database, LayoutDashboard, Layers3, ListChecks, MoreHorizontal, Package, Play, Plus, Power, Radio, RotateCcw, ScrollText, Search, Settings2, ShieldCheck, Users, X } from 'lucide-react';
 import { bbotClient as client } from './client';
 import { ServerConnectionPanel } from './ServerConnectionPanel';
 import { LiveViewModal } from './LiveViewModal';
@@ -16,6 +16,8 @@ const short:Record<BotState,string> = {DISCONNECTED:'Offline',CONNECTING:'Connec
 const tone=(s:string)=> ['IN_PIT_IDLE','ACTIVE','READY','COMPLETED'].includes(s)?'good':['PATHFINDING','WORKING','RUNNING','ASSIGNED'].includes(s)?'teal':['SUSPECT','RECOVERING','CONNECTING','JOINING_PIT','QUEUED'].includes(s)?'amber':['FAILED','EXPIRED'].includes(s)?'red':'quiet';
 const rel=(time:number)=>{const m=Math.max(0,Math.floor((Date.now()-time)/60000));return m<1?'たった今':m<60?`${m}分前`:m<1440?`${Math.floor(m/60)}時間前`:`${Math.floor(m/1440)}日前`};
 const retryText=(retryAt?:number)=>retryAt===undefined?'—':retryAt<=Date.now()?'Ready':`${Math.max(1,Math.ceil((retryAt-Date.now())/1000))}s`;
+const eventCountdown=(timestamp:number)=>{const seconds=Math.max(0,Math.ceil((timestamp-Date.now())/1000));if(seconds<60)return `${seconds}s`;const minutes=Math.floor(seconds/60);if(minutes<60)return `${minutes}m ${seconds%60}s`;const hours=Math.floor(minutes/60);return `${hours}h ${minutes%60}m`};
+const eventClock=(timestamp:number)=>new Date(timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 function Badge({status,label}:{status:string;label?:string}){return <span className={`badge ${tone(status)}`}><span className="badge-dot" aria-hidden="true" />{label??status}</span>}
 function Empty({title,detail}:{title:string;detail:string}){return <div className="empty"><Database size={26}/><strong>{title}</strong><p>{detail}</p></div>}
 function SectionHead({kicker,title,action}:{kicker?:string;title:string;action?:React.ReactNode}){return <div className="section-head"><div>{kicker&&<span className="eyebrow">{kicker}</span>}<h2>{title}</h2></div>{action}</div>}
@@ -159,12 +161,21 @@ function App(){
     {toast&&<div className="toast" role="status"><Check size={16}/>{toast}</div>}
   </div>
 }
+function CarePackagePanel({schedule}:{schedule:NonNullable<Snapshot['carePackages']>}){
+  return <section className="panel care-package-panel"><SectionHead kicker="PIT EVENTS" title="Next Care Packages" action={<a className="link" href={schedule.sourceUrl} target="_blank" rel="noreferrer">brookeafk.com <ArrowRight size={15}/></a>}/>
+    <div className="care-package-meta"><span className={`source-state ${schedule.status.toLowerCase()}`}>{schedule.status}</span><span>{schedule.updatedAt?`Updated ${rel(schedule.updatedAt)}`:'Waiting for first update'}</span></div>
+    {schedule.events.length?<div className="care-package-list">{schedule.events.map((event,index)=><div className="care-package-row" key={event.timestamp}>
+      <span className="care-package-icon"><Package size={17}/></span><span className="care-package-rank">#{index+1}</span><div><strong>Care Package</strong><small>{eventClock(event.timestamp)}</small></div><b className="care-package-countdown">{eventCountdown(event.timestamp)}</b>
+    </div>)}</div>:<p className="care-package-empty">{schedule.status==='UNAVAILABLE'?'イベント情報を取得できていません。':'今後のCare Packageが見つかりません。'}</p>}
+  </section>
+}
 function Dashboard({data,active,live,pending,go,perform}:{data:Snapshot;active:number;live:number;pending:number;go:(p:Page)=>void;perform:(task:()=>void,success?:string)=>void}){
   const suspect=data.instances.filter(i=>i.status==='SUSPECT').length;
   const perf=data.performance,pathBots=perf?.pathfinding.bots.filter(p=>p.pathAttempts>0)||[];
   const pings=perf?.pathfinding.bots.map(p=>p.pingMs).filter((v):v is number=>v!==undefined)||[],averagePing=pings.length?Math.round(pings.reduce((a,b)=>a+b,0)/pings.length):undefined;
   return <div className="dashboard"><div className="hero-status"><div className="hero-icon"><Activity size={22}/></div><div><div className="eyebrow">FLEET STATUS</div><strong>{active} of {data.bots.length} bots online</strong><p>Java 1.8.9 <span className="bullet">·</span> {client.mode==='remote'?'Live backend':'Mock data'}</p></div><span className="hero-wave" aria-hidden="true"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></span></div>
     <div className="metrics"><div className="metric"><div className="metric-label"><BotIcon size={17}/> BOTS</div><strong>{active}<span> / {data.settings.maxBots}</span></strong><small>{live} in Pit</small></div><div className="metric"><div className="metric-label"><Layers3 size={17}/> INSTANCES</div><strong>{data.instances.length}</strong><small>{suspect?`${suspect} need attention`:'All observed'}</small></div><div className="metric"><div className="metric-label"><ListChecks size={17}/> OPEN JOBS</div><strong>{pending}</strong><small>{data.jobs.filter(j=>j.state==='RUNNING').length} running</small></div></div>
+    {data.carePackages&&<CarePackagePanel schedule={data.carePackages}/>}
     {perf&&<section className="panel performance-panel"><SectionHead kicker="DIAGNOSTICS" title="Performance"/><div className="performance-metrics">
       <div><span>Process CPU</span><strong>{perf.runtime.cpuPercent.toFixed(1)}%</strong></div>
       <div><span>RSS memory</span><strong>{perf.runtime.rssMb.toFixed(1)} MB</strong></div>
