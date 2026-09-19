@@ -50,6 +50,7 @@ export interface BBotClient {
   startAssignedBots?():Promise<FleetActionResult>;
   stopAllBots?():Promise<FleetActionResult>;
   joinPit?(id:string):void|Promise<void>;
+  testLaunchPad?(id:string):void|Promise<void>;
   recoverBot(id:string):void;
   setBotState(id:string,state:BotState):void;
   createBots(count:number):void;
