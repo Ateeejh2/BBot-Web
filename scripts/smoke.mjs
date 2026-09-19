@@ -163,6 +163,7 @@ try {
   assert.ok(appSource.includes('Process CPU')&&appSource.includes('Event loop p99')&&appSource.includes('MC server ping')&&appSource.includes('Path slots'));
   assert.ok(appSource.includes('Next Care Packages')&&appSource.includes('brookeafk.com')&&appSource.includes('care-package-countdown'));
   assert.ok(appSource.includes('PREPARING_EVENT')&&appSource.includes('LIVE TRACKING')&&appSource.includes('CARRIER_DETECTED'));
+  assert.ok(appSource.includes('Test Launch Pad')&&appSource.includes('client.testLaunchPad!'));
   const { RemoteBBotClient } = await server.ssrLoadModule('/src/client/remote.ts');
   const oldWindow=globalThis.window,oldSocket=globalThis.WebSocket,oldFetch=globalThis.fetch;
   const oldLocalStorage=globalThis.localStorage,oldSessionStorage=globalThis.sessionStorage;
@@ -180,6 +181,7 @@ try {
       if(path==='/api/v1/settings/server'){const result={...JSON.parse(options.body),revision:3};wire={...wire,serverConnection:result};return Response.json(result)}
       if(path==='/api/v1/fleet/actions/start-assigned'&&options.method==='POST')return Response.json({started:['bot-1'],skipped:[]})
       if(path==='/api/v1/fleet/actions/stop-all'&&options.method==='POST')return Response.json({stopped:['bot-1']})
+      if(path==='/api/v1/bots/bot-1/actions/test-launch-pad'&&options.method==='POST'){wire={...wire,bots:wire.bots.map(b=>b.id==='bot-1'?{...b,state:'PREPARING_EVENT'}:b)};return Response.json(wire)}
       if(path==='/api/v1/jobs'&&options.method==='POST'){const submitted=JSON.parse(options.body);const job={id:'manual-test',eventType:submitted.eventType,instanceId:submitted.instanceId,state:'QUEUED',x:submitted.target.x,y:submitted.target.y,z:submitted.target.z,expiresAt:submitted.expiresAt,attempts:1,maxAttempts:3,lastFailure:'PATH_NOT_FOUND',lastFailureAt:Date.now(),retryAt:Date.now()+5000};wire={...wire,jobs:[job]};return Response.json(job,{status:201})}
       if(path==='/api/v1/bots/bot-1/actions/connect'&&options.method==='POST'&&failNextStart){
         failNextStart=false;
@@ -213,6 +215,7 @@ try {
     assert.equal((await remote.saveServerConnection({host:'next.example',port:25565,version:'1.8.9'})).revision,3);
     assert.deepEqual((await remote.startAssignedBots()).started,['bot-1']);
     assert.deepEqual((await remote.stopAllBots()).stopped,['bot-1']);
+    await remote.testLaunchPad('bot-1');assert.equal(remote.getSnapshot().bots[0]?.state,'PREPARING_EVENT');
     const manualJob=await remote.submitJob({instanceId:'mega-a',eventType:'manual.test',target:{x:1,y:64,z:-2},expiresAt:Date.now()+60000});
     assert.equal(manualJob.id,'manual-test');assert.equal(manualJob.maxAttempts,3);assert.equal(manualJob.lastFailure,'PATH_NOT_FOUND');
     assert.equal(remote.getSnapshot().jobs[0]?.instanceId,'mega-a');assert.equal(remote.getSnapshot().jobs[0]?.retryAt!==undefined,true);
@@ -234,6 +237,7 @@ try {
     assert.equal(requests.some(r=>r.path==='/api/v1/accounts'&&r.options.method==='POST'),true);
     assert.equal(requests.some(r=>r.path==='/api/v1/fleet/actions/start-assigned'&&r.options.method==='POST'),true);
     assert.equal(requests.some(r=>r.path==='/api/v1/fleet/actions/stop-all'&&r.options.method==='POST'),true);
+    assert.equal(requests.some(r=>r.path==='/api/v1/bots/bot-1/actions/test-launch-pad'&&r.options.method==='POST'),true);
     assert.equal(requests.some(r=>r.path==='/api/v1/jobs'&&r.options.method==='POST'),true);
     assert.equal(JSON.stringify(requests).includes('SECRET_REFRESH_TOKEN'),false);
     assert.equal(requests.filter(r=>r.options?.body&&/accessToken/.test(r.options.body)).length,2);
