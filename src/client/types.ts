@@ -53,6 +53,7 @@ export interface BBotClient {
   joinPit?(id:string):void|Promise<void>;
   testLaunchPad?(id:string):void|Promise<void>;
   testCarePackage?(id:string):void|Promise<void>;
+  oofBot?(id:string):void|Promise<void>;
   setMovementDebug?(enabled:boolean):Promise<void>;
   recoverBot(id:string):void;
   setBotState(id:string,state:BotState):void;
