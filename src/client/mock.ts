@@ -142,7 +142,7 @@ export class MockBBotClient implements BBotClient {
     this.nextBotConnectionGeneration(id);this.reconnectInFlight.delete(id);
     if(['DISCONNECTED','CONNECTING','LOBBY','JOINING_PIT','RECOVERING'].includes(state))this.invalidateTrade(id);
     this.update(s=>{const b=this.getBot(s,id);if(['DISCONNECTED','CONNECTING','LOBBY','JOINING_PIT','RECOVERING'].includes(state))this.leave(s,b);
-      if(['IN_PIT_IDLE','PATHFINDING','WORKING'].includes(state) && !b.instanceId)b.instanceId=s.instances.find(i=>i.status==='ACTIVE')?.id;
+      if(['IN_PIT_IDLE','PREPARING_EVENT','PATHFINDING','WORKING'].includes(state) && !b.instanceId)b.instanceId=s.instances.find(i=>i.status==='ACTIVE')?.id;
       b.state=state;b.updatedAt=Date.now();this.log(s,`${b.name} → ${state}`,'INFO',{botId:id,instanceId:b.instanceId});});}
   createBots(count:number) {if(!Number.isInteger(count)||count<1||count>20)throw Error('1〜20体を指定してください');
     this.update(s=>{const previous=s.bots.length;const actual=Math.min(count,s.settings.maxBots);for(let i=previous;i<actual;i++){
