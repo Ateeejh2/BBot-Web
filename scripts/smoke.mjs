@@ -202,7 +202,8 @@ try {
     const remote=new RemoteBBotClient();await new Promise(resolve=>setTimeout(resolve,0));
     assert.equal(remote.getServerConnection().host,'play.example.com');
     assert.equal(remote.getSnapshot().performance?.runtime.cpuPercent,12.5);
-    assert.equal(remote.getSnapshot().performance?.pathfinding.bots[0]?.pingMs,87);\n    assert.equal(remote.getSnapshot().performance?.pathfinding.bots[0]?.lastPathMs,250);
+    assert.equal(remote.getSnapshot().performance?.pathfinding.bots[0]?.pingMs,87);
+    assert.equal(remote.getSnapshot().performance?.pathfinding.bots[0]?.lastPathMs,250);
     assert.equal((await remote.saveServerConnection({host:'next.example',port:25565,version:'1.8.9'})).revision,3);
     assert.deepEqual((await remote.startAssignedBots()).started,['bot-1']);
     assert.deepEqual((await remote.stopAllBots()).stopped,['bot-1']);
