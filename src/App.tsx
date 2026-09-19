@@ -98,6 +98,7 @@ function App(){
   const assignedReadyOffline=snapshot.bots.filter(b=>b.state==='DISCONNECTED'&&!b.startQueued&&snapshot.accounts.some(a=>a.assignedBot===b.id&&a.status==='READY')).length;
   const live=snapshot.bots.filter(b=>['IN_PIT_IDLE','PREPARING_EVENT','PATHFINDING','WORKING'].includes(b.state)).length;
   const pending=snapshot.jobs.filter(j=>['QUEUED','ASSIGNED','RUNNING'].includes(j.state)).length;
+  const movementDebugLocked=snapshot.bots.some(b=>b.state!=='DISCONNECTED'||Boolean(b.startQueued));
   const current=nav.find(n=>n.id===page)!;
   return <div className="app-shell">
     <aside className="sidebar"><div className="brand"><span className="brand-mark">B<span>.</span></span><div><strong>BBot</strong><small>CONTROL ROOM</small></div></div>
@@ -145,7 +146,10 @@ function App(){
             </div></>}</article>)}</div>:<Empty title="Jobはありません" detail={client.mode==='remote'?'観測済みinstanceへManual Jobを投入できます。':'Mock Jobを作成してください。'}/>}</section>}
       {page==='accounts'&&client.mode==='remote'&&<RemoteAccountsPanel snapshot={snapshot} notify={setToast}/>}
       {page==='accounts'&&client.mode==='mock'&&<section className="view-section"><div className="insight"><ShieldCheck size={20}/><p>Session AccountはUIのみ。Mockではtokenを入力・保持せず、Bot本体への認証も行いません。</p></div><div className="list-label">ACCOUNTS <span>{snapshot.accounts.length} ADDED</span></div><div className="account-list">{snapshot.accounts.map(a=><div className="account-row" key={a.id}><div className="account-avatar">{a.label.slice(0,1).toUpperCase()}</div><div><strong>{a.label}</strong><span>{a.kind==='SESSION'?'Session Account':'Microsoft Account'} · {a.status==='UNASSIGNED'?'Unassigned':'Mock ready'}</span></div><span className="account-lock"><ShieldCheck size={16}/><span>No token</span></span></div>)}</div></section>}
-      {page==='settings'&&client.mode==='remote'&&<section className="view-section settings-grid"><ServerConnectionPanel snapshot={snapshot} notify={setToast}/></section>}
+      {page==='settings'&&client.mode==='remote'&&<section className="view-section settings-grid"><ServerConnectionPanel snapshot={snapshot} notify={setToast}/><div className="panel"><div className="panel-icon"><Settings2 size={21}/></div><h2>Movement Debug Mode</h2><p className="muted">ONでBotは接続後、最初のspawnから短いpathfindを1回だけ実行します。/play pit、Job、Care Package処理は実行しません。</p>
+        <div className="setting-row"><div><strong>Connect → Pathfind only</strong><small>{movementDebugLocked?'全BotをStopすると切り替えできます':'Anti-Cheat movement確認用'}</small></div><button role="switch" aria-checked={Boolean(snapshot.movementDebug)} aria-label="Movement Debug Mode" disabled={movementDebugLocked} onClick={()=>perform(()=>client.setMovementDebug!(!snapshot.movementDebug),`Movement Debug Modeを${snapshot.movementDebug?'OFF':'ON'}にしました`)} className={`toggle ${snapshot.movementDebug?'on':''}`}><span/></button></div>
+        {snapshot.movementDebug&&<div className="insight" role="status"><Activity size={18}/><p>Debug Mode ON: Startすると接続 → first spawn → 約6 blocksのpathfindだけを実行し、Lobbyに残ります。</p></div>}
+      </div></section>}
       {page==='settings'&&client.mode==='mock'&&<section className="view-section settings-grid"><ServerConnectionPanel snapshot={snapshot} notify={setToast}/><div className="panel"><div className="panel-icon"><Settings2 size={21}/></div><h2>Mock configuration</h2><p className="muted">この画面だけの一時設定。再読み込みで初期状態に戻ります。</p>
         <SettingSelect label="Bot limit" value={snapshot.settings.maxBots} options={[6,10,15,20]} onChange={value=>perform(()=>client.updateSettings({maxBots:value}))}/>
         <SettingSelect label="Pathfinding concurrency" value={snapshot.settings.pathConcurrency} options={[1,2,3,4]} onChange={value=>perform(()=>client.updateSettings({pathConcurrency:value}))}/>
