@@ -6,7 +6,8 @@ export type JobStatus = 'QUEUED' | 'ASSIGNED' | 'RUNNING' | 'COMPLETED' | 'FAILE
 export type AccountKind = 'SESSION' | 'MICROSOFT';
 export interface Bot { id:string; accountId:string; name:string; state:BotState; startQueued?:boolean; instanceId?:string; x:number;y:number;z:number; jobId?:string; updatedAt:number; kickReason?:string; kickedAt?:number }
 export interface Instance { id:string; status:InstanceStatus; firstSeen:number; lastSeen:number; metadata?:string }
-export interface Job { id:string; eventType:string; instanceId:string; state:JobStatus; botId?:string; x:number;y:number;z:number; expiresAt:number }
+export type JobFailureReason = 'PATH_NOT_FOUND'|'PATH_TIMEOUT'|'PATH_CANCELLED'|'PATH_REJECTED'|'PATH_FAILED'|'INSTANCE_LOST'|'JOB_EXPIRED'|'TASK_TIMEOUT'|'TASK_FAILED';
+export interface Job { id:string; eventType:string; instanceId:string; state:JobStatus; botId?:string; x:number;y:number;z:number; expiresAt:number; attempts?:number; maxAttempts?:number; lastFailure?:JobFailureReason; lastFailureAt?:number; retryAt?:number }
 export interface JobCreateInput { instanceId:string; eventType:string; target:{x:number;y:number;z:number}; expiresAt:number }
 export interface RuntimePerformance { cpuPercent:number; rssMb:number; heapUsedMb:number; heapTotalMb:number; eventLoopMeanMs:number; eventLoopP99Ms:number; eventLoopMaxMs:number; uptimeSeconds:number }
 export interface BotPathPerformance { botId:string; pingMs?:number; pathAttempts:number; pathCompleted:number; pathFailed:number; activePathMs?:number; lastPathMs?:number; lastPathQueueMs?:number }
