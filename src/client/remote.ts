@@ -2,7 +2,7 @@ import type { BBotClient, BotState, Snapshot, Settings, InstanceStatus, JobStatu
 import { defaultServerConnection, type ServerConnection, type ReconnectResult } from './serverConnection';
 
 type Wire = { version:number; bots:Array<{id:string;accountId?:string;accountLabel:string;minecraftName?:string;state:BotState;startQueued?:boolean;instanceId?:string;jobId?:string;position?:{x:number;y:number;z:number};kickReason?:string;kickedAt?:number}>;
-  instances:Snapshot['instances'];jobs?:Snapshot['jobs'];performance?:Snapshot['performance'];carePackages?:Snapshot['carePackages'];carePackageTracking?:Snapshot['carePackageTracking'];logs:Array<{id:number;at:number;level:string;message:string;botId?:string;instanceId?:string;kickReason?:string}>;
+  instances:Snapshot['instances'];jobs?:Snapshot['jobs'];performance?:Snapshot['performance'];carePackages?:Snapshot['carePackages'];carePackageTracking?:Snapshot['carePackageTracking'];logs:Array<{id:number;at:number;level:string;message:string;botId?:string;instanceId?:string;kickReason?:string;detail?:string}>;
   viewer:{botId:string;url:string}|null;accounts?:Snapshot['accounts'];serverConnection?:Snapshot['serverConnection'] };
 const unsupported = ():never => {throw Error('この操作は実Botではまだ利用できません')};
 const idleTrade = ():TradeState => ({status:'IDLE',tradeSessionId:null,targetUsername:null,revision:0,window:null});
@@ -27,7 +27,7 @@ export class RemoteBBotClient implements BBotClient {
         x:b.position?.x??0,y:b.position?.y??0,z:b.position?.z??0,updatedAt:Date.now(),kickReason:b.kickReason??kicks.get(b.id),kickedAt:b.kickedAt})),
       accounts:data.accounts??[],
       logs:data.logs.map(l=>({id:l.id,at:l.at,level:l.level==='WARN'?'WARN' as const:l.level==='ERROR'?'ERROR' as const:'INFO' as const,
-        message:l.kickReason?`${l.message}: ${l.kickReason}`:l.message,botId:l.botId,instanceId:l.instanceId}))};
+        message:l.kickReason?`${l.message}: ${l.kickReason}`:l.detail?`${l.message}: ${l.detail}`:l.message,botId:l.botId,instanceId:l.instanceId}))};
     this.listeners.forEach(listener=>listener());
   }
   private async refresh(){try{const r=await fetch('/api/v1/status',{headers:{'X-BBot-UI':'1'},credentials:'same-origin',cache:'no-store'});if(r.ok){this.apply(await r.json() as Wire);this.connected(true);return true}}catch{/* Keep polling while WebSocket is unavailable. */}return false}
