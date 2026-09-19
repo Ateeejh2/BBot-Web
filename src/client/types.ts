@@ -9,7 +9,7 @@ export interface Instance { id:string; status:InstanceStatus; firstSeen:number; 
 export interface Job { id:string; eventType:string; instanceId:string; state:JobStatus; botId?:string; x:number;y:number;z:number; expiresAt:number }
 export interface JobCreateInput { instanceId:string; eventType:string; target:{x:number;y:number;z:number}; expiresAt:number }
 export interface RuntimePerformance { cpuPercent:number; rssMb:number; heapUsedMb:number; heapTotalMb:number; eventLoopMeanMs:number; eventLoopP99Ms:number; eventLoopMaxMs:number; uptimeSeconds:number }
-export interface BotPathPerformance { botId:string; pathAttempts:number; pathCompleted:number; pathFailed:number; activePathMs?:number; lastPathMs?:number; lastPathQueueMs?:number }
+export interface BotPathPerformance { botId:string; pingMs?:number; pathAttempts:number; pathCompleted:number; pathFailed:number; activePathMs?:number; lastPathMs?:number; lastPathQueueMs?:number }
 export interface PerformanceSnapshot { runtime:RuntimePerformance; pathfinding:{active:number;queued:number;concurrency:number;bots:BotPathPerformance[]} }
 export interface Account { id:string; label:string; kind:AccountKind; status:'READY'|'UNASSIGNED'|'WAITING_FOR_LOGIN'|'ERROR'; minecraftName?:string; assignedBot?:string; createdAt:number; authError?:'SESSION_TOKEN_INVALID' }
 export interface MicrosoftAuthChallenge { verificationUri:string; userCode:string; expiresAt:number }
