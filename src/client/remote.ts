@@ -38,7 +38,7 @@ export class RemoteBBotClient implements BBotClient {
     socket.onopen=()=>{this.failures=0;this.connected(true)};
     socket.onclose=()=>{if(this.socket!==socket)return;void this.refresh().then(ok=>{if(!ok)this.connected(false)});setTimeout(()=>{this.open()},Math.min(1000*2**this.failures++,10000))};
   }
-  private async action(id:string,name:'connect'|'join-pit'|'disconnect'|'test-launch-pad'){
+  private async action(id:string,name:'connect'|'join-pit'|'disconnect'|'test-launch-pad'|'test-care-package'){
     if(!/^bot-[1-9]\d*$/.test(id))throw Error('無効なBot IDです');
     const r=await fetch(`/api/v1/bots/${id}/actions/${name}`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',credentials:'same-origin'});
     const data=await r.json().catch(()=>null) as (Wire|{error?:string}|null);
@@ -82,6 +82,7 @@ export class RemoteBBotClient implements BBotClient {
   }
   joinPit(id:string){return this.action(id,'join-pit')}
   testLaunchPad(id:string){return this.action(id,'test-launch-pad')}
+  testCarePackage(id:string){return this.action(id,'test-care-package')}
   async setMovementDebug(enabled:boolean){
     const r=await fetch('/api/v1/settings/movement-debug',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled}),credentials:'same-origin'});
     const data=await r.json().catch(()=>null) as ({enabled?:boolean;error?:string}|null);
