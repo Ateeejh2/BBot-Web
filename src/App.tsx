@@ -62,6 +62,7 @@ function BotCard({bot,compact,onAction,trade,onLiveView}:{bot:Bot;compact?:boole
     <div className="card-actions">
       {!active?<button className="mini primary-mini" onClick={()=>onAction(()=>client.startBot(bot.id))}><Play size={15}/> Start</button>:<button className="mini" onClick={()=>onAction(()=>client.stopBot(bot.id))}><Power size={15}/> Stop</button>}
       {client.mode==='mock'&&active&&<button className="mini" onClick={()=>onAction(()=>client.recoverBot(bot.id))}><RotateCcw size={15}/> Recover</button>}
+      {client.mode==='remote'&&bot.state==='IN_PIT_IDLE'&&<button className="mini launch-test-button" onClick={()=>onAction(()=>client.testLaunchPad!(bot.id))}><ArrowRight size={15}/> Test Launch Pad</button>}
       {!compact&&<button className="mini live-view-button" disabled={!active} onClick={()=>onLiveView?.(bot)}><Radio size={15}/> Live View</button>}
       {!compact&&client.mode==='mock'&&<label className="select-wrap"><span className="sr-only">{bot.name} の状態</span><select value={bot.state} onChange={e=>onAction(()=>client.setBotState(bot.id,e.target.value as BotState))} aria-label={`${bot.name} の状態を試す`}>
         {botStates.map(s=><option key={s} value={s}>{s}</option>)}</select><ChevronDown size={13}/></label>}
