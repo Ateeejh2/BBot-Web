@@ -242,10 +242,10 @@ try {
     wire={...wire,transport:'forge',forgeWorkers:[{botId:'bot-1',phase:'LAUNCHED',bridgePort:3010}],
       bots:wire.bots.map(b=>b.id==='bot-1'?{...b,state:'DISCONNECTED'}:b)};
     await remote['refresh']();
-    await remote.launchForge!('bot-1');
+    await remote.launchForge('bot-1');
     await remote.startBot('bot-1');
     await remote.stopBot('bot-1');
-    await remote.quitForge!('bot-1');
+    await remote.quitForge('bot-1');
     assert.equal(requests.some(r=>r.path==='/api/v1/bots/bot-1/actions/launch'&&r.options.method==='POST'),true);
     assert.equal(requests.some(r=>r.path==='/api/v1/bots/bot-1/actions/start'&&r.options.method==='POST'),true);
     assert.equal(requests.some(r=>r.path==='/api/v1/bots/bot-1/actions/disconnect'&&r.options.method==='POST'),true);
