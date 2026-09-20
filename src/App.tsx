@@ -55,6 +55,7 @@ function BotCard({bot,compact,onAction,trade,onLiveView,transport,worker}:{bot:B
   const workerPhase=worker?.phase??'STOPPED';
   const launched=workerPhase==='LAUNCHED';
   const serverDisconnectable=!['DISCONNECTED','CONNECTING'].includes(bot.state);
+  const showSecondary=!compact&&(client.mode==='mock'&&active||client.mode==='remote'&&bot.state==='IN_PIT_IDLE'||client.mode==='remote'&&!['DISCONNECTED','CONNECTING'].includes(bot.state)||Boolean(onLiveView));
   return <article className={`bot-card ${compact?'compact':''}`}>
     <div className="bot-main"><div className={`bot-avatar ${tone(bot.state)}`}><BotIcon size={21} strokeWidth={1.8}/></div>
       <div className="bot-identity"><strong>{bot.name}</strong><span className="mono faint">{bot.id} · {bot.instanceId??'No instance'}{forge?` · Forge ${workerPhase}`:''}</span></div>
@@ -63,12 +64,14 @@ function BotCard({bot,compact,onAction,trade,onLiveView,transport,worker}:{bot:B
       <AlertTriangle size={15}/><div><strong>Last kick{bot.kickedAt!==undefined?` · ${rel(bot.kickedAt)}`:''}</strong><span>{bot.kickReason}</span></div>
     </div>}
     {!compact&&<div className="bot-details"><span>Position <b className="mono">{bot.state!=='DISCONNECTED'?`${bot.x.toFixed(1)} / ${bot.y.toFixed(1)} / ${bot.z.toFixed(1)}`:'—'}</b></span><span>Job <b className="mono">{bot.jobId??'—'}</b></span></div>}
-    <div className="card-actions">
+    <div className="card-actions lifecycle-actions">
       {forge?<><button className="mini" disabled={workerPhase!=='STOPPED'} onClick={()=>onAction(()=>client.launchForge!(bot.id))}><Power size={15}/> {workerPhase==='LAUNCHING'?'Launching...':'Launch'}</button>
         <button className="mini" disabled={!launched} onClick={()=>onAction(()=>client.quitForge!(bot.id))}><X size={15}/> Quit</button>
         <button className="mini primary-mini" disabled={!launched||active} onClick={()=>onAction(()=>client.startBot(bot.id))}><Play size={15}/> Start</button>
         <button className="mini" disabled={!launched||!serverDisconnectable} onClick={()=>onAction(()=>client.stopBot(bot.id))}><Power size={15}/> Disconnect</button></>
         :!active?<button className="mini primary-mini" onClick={()=>onAction(()=>client.startBot(bot.id))}><Play size={15}/> Start</button>:<button className="mini" onClick={()=>onAction(()=>client.stopBot(bot.id))}><Power size={15}/> Stop</button>}
+    </div>
+    {showSecondary&&<div className="card-actions secondary-actions">
       {client.mode==='mock'&&active&&<button className="mini" onClick={()=>onAction(()=>client.recoverBot(bot.id))}><RotateCcw size={15}/> Recover</button>}
       {client.mode==='remote'&&bot.state==='IN_PIT_IDLE'&&<button className="mini launch-test-button" onClick={()=>onAction(()=>client.testLaunchPad!(bot.id))}><ArrowRight size={15}/> Test Launch Pad</button>}
       {client.mode==='remote'&&bot.state==='IN_PIT_IDLE'&&<button className="mini" onClick={()=>onAction(()=>client.testCarePackage!(bot.id))}><Package size={15}/> Test Care Package</button>}
@@ -76,7 +79,7 @@ function BotCard({bot,compact,onAction,trade,onLiveView,transport,worker}:{bot:B
       {!compact&&<button className="mini live-view-button" disabled={!active} onClick={()=>onLiveView?.(bot)}><Radio size={15}/> Live View</button>}
       {!compact&&client.mode==='mock'&&<label className="select-wrap"><span className="sr-only">{bot.name} の状態</span><select value={bot.state} onChange={e=>onAction(()=>client.setBotState(bot.id,e.target.value as BotState))} aria-label={`${bot.name} の状態を試す`}>
         {botStates.map(s=><option key={s} value={s}>{s}</option>)}</select><ChevronDown size={13}/></label>}
-    </div>
+    </div>}
     {!compact&&trade&&client.mode==='mock'&&<TradePanel bot={bot} trade={trade} onAction={onAction}/>}
   </article>
 }
@@ -196,13 +199,19 @@ function Dashboard({data,active,live,pending,go,perform}:{data:Snapshot;active:n
   const suspect=data.instances.filter(i=>i.status==='SUSPECT').length;
   const perf=data.performance,pathBots=perf?.pathfinding.bots.filter(p=>p.pathAttempts>0)||[];
   const pings=perf?.pathfinding.bots.map(p=>p.pingMs).filter((v):v is number=>v!==undefined)||[],averagePing=pings.length?Math.round(pings.reduce((a,b)=>a+b,0)/pings.length):undefined;
+  const forgeWorkers=data.transport==='forge'?(data.forgeWorkers??[]).filter(worker=>worker.phase!=='STOPPED'):[];
+  const resourceWorkers=forgeWorkers.filter(worker=>worker.cpuPercent!==undefined&&worker.rssMb!==undefined);
+  const forgeCpu=resourceWorkers.length?resourceWorkers.reduce((sum,worker)=>sum+(worker.cpuPercent??0),0):undefined;
+  const forgeRss=resourceWorkers.length?resourceWorkers.reduce((sum,worker)=>sum+(worker.rssMb??0),0):undefined;
+  const forgeProcesses=resourceWorkers.reduce((sum,worker)=>sum+(worker.processCount??0),0);
+  const forgeMode=data.transport==='forge';
   return <div className="dashboard"><div className="hero-status"><div className="hero-icon"><Activity size={22}/></div><div><div className="eyebrow">FLEET STATUS</div><strong>{active} of {data.bots.length} bots online</strong><p>Java 1.8.9 <span className="bullet">·</span> {client.mode==='remote'?'Live backend':'Mock data'}</p></div><span className="hero-wave" aria-hidden="true"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></span></div>
     <div className="metrics"><div className="metric"><div className="metric-label"><BotIcon size={17}/> BOTS</div><strong>{active}<span> / {data.settings.maxBots}</span></strong><small>{live} in Pit</small></div><div className="metric"><div className="metric-label"><Layers3 size={17}/> INSTANCES</div><strong>{data.instances.length}</strong><small>{suspect?`${suspect} need attention`:'All observed'}</small></div><div className="metric"><div className="metric-label"><ListChecks size={17}/> OPEN JOBS</div><strong>{pending}</strong><small>{data.jobs.filter(j=>j.state==='RUNNING').length} running</small></div></div>
     {data.carePackages&&<CarePackagePanel schedule={data.carePackages} tracking={data.carePackageTracking}/>}
     {perf&&<section className="panel performance-panel"><SectionHead kicker="DIAGNOSTICS" title="Performance"/><div className="performance-metrics">
-      <div><span>Process CPU</span><strong>{perf.runtime.cpuPercent.toFixed(1)}%</strong></div>
-      <div><span>RSS memory</span><strong>{perf.runtime.rssMb.toFixed(1)} MB</strong></div>
-      <div><span>Event loop p99</span><strong>{perf.runtime.eventLoopP99Ms.toFixed(1)} ms</strong></div>
+      <div><span>{forgeMode?'Forge CPU':'Backend CPU'}</span><strong>{forgeMode?(forgeCpu===undefined?'—':`${forgeCpu.toFixed(1)}%`):`${perf.runtime.cpuPercent.toFixed(1)}%`}</strong>{forgeMode&&<small>{resourceWorkers.length} worker · {forgeProcesses} processes</small>}</div>
+      <div><span>{forgeMode?'Forge RSS memory':'Backend RSS memory'}</span><strong>{forgeMode?(forgeRss===undefined?'—':`${forgeRss.toFixed(1)} MB`):`${perf.runtime.rssMb.toFixed(1)} MB`}</strong>{forgeMode&&<small>HeadlessMC + Minecraft</small>}</div>
+      <div><span>Backend event loop p99</span><strong>{perf.runtime.eventLoopP99Ms.toFixed(1)} ms</strong><small>Node control plane</small></div>
       <div><span>MC server ping</span><strong>{averagePing===undefined?'—':`${averagePing} ms`}</strong><small>{pings.length} bots reporting</small></div>
       <div><span>Path slots</span><strong>{perf.pathfinding.active} / {perf.pathfinding.concurrency}</strong><small>{perf.pathfinding.queued} queued</small></div>
     </div>
