@@ -56,10 +56,16 @@ function BotCard({bot,compact,onAction,trade,onLiveView,transport,worker}:{bot:B
   const launched=workerPhase==='LAUNCHED';
   const serverDisconnectable=!['DISCONNECTED','CONNECTING'].includes(bot.state);
   const showSecondary=!compact&&(client.mode==='mock'&&active||client.mode==='remote'&&bot.state==='IN_PIT_IDLE'||client.mode==='remote'&&!['DISCONNECTED','CONNECTING'].includes(bot.state)||Boolean(onLiveView));
+  const progressLabel=workerPhase==='LAUNCHING'
+    ?`Launching Forge... ${Math.max(0,Math.min(100,Math.round(worker?.launchProgress??0)))}%`
+    :bot.activity?.kind==='SCANNING_CHUNKS'
+      ?`Scanning chunk... ${Math.max(0,Math.min(100,Math.round(bot.activity.progress)))}%`
+      :undefined;
+  const badgeStatus=workerPhase==='LAUNCHING'?'CONNECTING':bot.activity?.kind==='SCANNING_CHUNKS'?'PATHFINDING':bot.state;
   return <article className={`bot-card ${compact?'compact':''}`}>
     <div className="bot-main"><div className={`bot-avatar ${tone(bot.state)}`}><BotIcon size={21} strokeWidth={1.8}/></div>
       <div className="bot-identity"><strong>{bot.name}</strong><span className="mono faint">{bot.id} · {bot.instanceId??'No instance'}{forge?` · Forge ${workerPhase}`:''}</span></div>
-      <Badge status={bot.state} label={bot.startQueued?'Queued':short[bot.state]}/></div>
+      <Badge status={badgeStatus} label={progressLabel??(bot.startQueued?'Queued':short[bot.state])}/></div>
     {bot.kickReason&&<div className={`bot-kick ${compact?'compact-kick':''}`} role={bot.state==='DISCONNECTED'?'alert':'status'}>
       <AlertTriangle size={15}/><div><strong>Last kick{bot.kickedAt!==undefined?` · ${rel(bot.kickedAt)}`:''}</strong><span>{bot.kickReason}</span></div>
     </div>}
