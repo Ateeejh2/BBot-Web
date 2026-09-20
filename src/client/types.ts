@@ -4,9 +4,9 @@ export type BotState = typeof botStates[number];
 export type InstanceStatus = 'ACTIVE' | 'SUSPECT' | 'INACTIVE';
 export type JobStatus = 'QUEUED' | 'ASSIGNED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
 export type AccountKind = 'SESSION' | 'MICROSOFT';
-export interface Bot { id:string; accountId:string; name:string; state:BotState; startQueued?:boolean; instanceId?:string; x:number;y:number;z:number; jobId?:string; updatedAt:number; kickReason?:string; kickedAt?:number }
+export interface Bot { id:string; accountId:string; name:string; state:BotState; startQueued?:boolean; instanceId?:string; x:number;y:number;z:number; jobId?:string; updatedAt:number; kickReason?:string; kickedAt?:number; activity?:{kind:'SCANNING_CHUNKS';progress:number} }
 export type ForgeWorkerPhase = 'STOPPED'|'LAUNCHING'|'LAUNCHED'|'STOPPING';
-export interface ForgeWorker { botId:string; phase:ForgeWorkerPhase; bridgePort:number; lastError?:string; cpuPercent?:number; rssMb?:number; processCount?:number }
+export interface ForgeWorker { botId:string; phase:ForgeWorkerPhase; bridgePort:number; lastError?:string; cpuPercent?:number; rssMb?:number; processCount?:number; launchProgress?:number }
 export interface Instance { id:string; status:InstanceStatus; firstSeen:number; lastSeen:number; metadata?:string }
 export type JobFailureReason = 'PATH_NOT_FOUND'|'PATH_TIMEOUT'|'PATH_CANCELLED'|'PATH_REJECTED'|'PATH_FAILED'|'INSTANCE_LOST'|'JOB_EXPIRED'|'TASK_TIMEOUT'|'TASK_FAILED';
 export interface Job { id:string; eventType:string; instanceId:string; state:JobStatus; botId?:string; x:number;y:number;z:number; expiresAt:number; attempts?:number; maxAttempts?:number; lastFailure?:JobFailureReason; lastFailureAt?:number; retryAt?:number }
