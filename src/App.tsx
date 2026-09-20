@@ -59,7 +59,7 @@ function BotCard({bot,compact,onAction,trade,onLiveView,transport,worker}:{bot:B
   const progressLabel=workerPhase==='LAUNCHING'
     ?`Launching Forge... ${Math.max(0,Math.min(100,Math.round(worker?.launchProgress??0)))}%`
     :bot.activity?.kind==='SCANNING_CHUNKS'
-      ?`Scanning chunk... ${Math.max(0,Math.min(100,Math.round(bot.activity.progress)))}%`
+      ?`scanning chunk... ${Math.max(0,Math.min(100,Math.round(bot.activity.progress)))}%`
       :undefined;
   const badgeStatus=workerPhase==='LAUNCHING'?'CONNECTING':bot.activity?.kind==='SCANNING_CHUNKS'?'PATHFINDING':bot.state;
   return <article className={`bot-card ${compact?'compact':''}`}>
