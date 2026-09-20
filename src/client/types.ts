@@ -5,6 +5,8 @@ export type InstanceStatus = 'ACTIVE' | 'SUSPECT' | 'INACTIVE';
 export type JobStatus = 'QUEUED' | 'ASSIGNED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
 export type AccountKind = 'SESSION' | 'MICROSOFT';
 export interface Bot { id:string; accountId:string; name:string; state:BotState; startQueued?:boolean; instanceId?:string; x:number;y:number;z:number; jobId?:string; updatedAt:number; kickReason?:string; kickedAt?:number }
+export type ForgeWorkerPhase = 'STOPPED'|'LAUNCHING'|'LAUNCHED'|'STOPPING';
+export interface ForgeWorker { botId:string; phase:ForgeWorkerPhase; bridgePort:number; lastError?:string }
 export interface Instance { id:string; status:InstanceStatus; firstSeen:number; lastSeen:number; metadata?:string }
 export type JobFailureReason = 'PATH_NOT_FOUND'|'PATH_TIMEOUT'|'PATH_CANCELLED'|'PATH_REJECTED'|'PATH_FAILED'|'INSTANCE_LOST'|'JOB_EXPIRED'|'TASK_TIMEOUT'|'TASK_FAILED';
 export interface Job { id:string; eventType:string; instanceId:string; state:JobStatus; botId?:string; x:number;y:number;z:number; expiresAt:number; attempts?:number; maxAttempts?:number; lastFailure?:JobFailureReason; lastFailureAt?:number; retryAt?:number }
@@ -30,7 +32,7 @@ export const validMinecraftUsername = (value:string):boolean => /^[A-Za-z0-9_]{1
 export const canSendMinecraftCommand = (state:BotState):boolean => ['LOBBY','IN_PIT_IDLE','PATHFINDING','WORKING'].includes(state);
 export const isConnectedBot = (state:BotState):boolean => ['LOBBY','JOINING_PIT','IN_PIT_IDLE','PREPARING_EVENT','PATHFINDING','WORKING'].includes(state);
 export interface PartyCommandResult { status:'SENT'|'REJECTED'; message:string; serverMessage?:string }
-export interface Snapshot { bots:Bot[]; instances:Instance[]; jobs:Job[]; accounts:Account[]; logs:LogEntry[]; chatLogs:ChatLogEntry[]; settings:Settings; serverConnection:ServerConnectionRecord; trades:Record<string,TradeState>; revision:number; transport?:'mineflayer'|'forge'; performance?:PerformanceSnapshot; carePackages?:CarePackageSchedule; carePackageTracking?:CarePackageTracking; movementDebug?:boolean; viewer?:{botId:string;url:string}|null; remoteConnected?:boolean }
+export interface Snapshot { bots:Bot[]; forgeWorkers?:ForgeWorker[]; instances:Instance[]; jobs:Job[]; accounts:Account[]; logs:LogEntry[]; chatLogs:ChatLogEntry[]; settings:Settings; serverConnection:ServerConnectionRecord; trades:Record<string,TradeState>; revision:number; transport?:'mineflayer'|'forge'; performance?:PerformanceSnapshot; carePackages?:CarePackageSchedule; carePackageTracking?:CarePackageTracking; movementDebug?:boolean; viewer?:{botId:string;url:string}|null; remoteConnected?:boolean }
 export interface BBotClient {
   readonly mode:'mock'|'remote';
   getSnapshot():Snapshot;
@@ -48,6 +50,8 @@ export interface BBotClient {
   warpParty(botId:string):PartyCommandResult|Promise<PartyCommandResult>;
   startBot(id:string):void|Promise<void>;
   stopBot(id:string):void|Promise<void>;
+  launchForge?(id:string):Promise<void>;
+  quitForge?(id:string):Promise<void>;
   startAssignedBots?():Promise<FleetActionResult>;
   stopAllBots?():Promise<FleetActionResult>;
   joinPit?(id:string):void|Promise<void>;
