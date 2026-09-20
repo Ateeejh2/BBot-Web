@@ -160,7 +160,7 @@ try {
   const appSource=await (await import('node:fs/promises')).readFile('src/App.tsx','utf8');
   assert.ok(appSource.includes('Submit Job')&&appSource.includes('client.submitJob!'));
   assert.ok(appSource.includes('Attempts')&&appSource.includes('Last failure')&&appSource.includes('Retry'));
-  assert.ok(appSource.includes('Process CPU')&&appSource.includes('Event loop p99')&&appSource.includes('MC server ping')&&appSource.includes('Path slots'));
+  assert.ok(appSource.includes('Forge CPU')&&appSource.includes('Forge RSS memory')&&appSource.includes('Backend event loop p99')&&appSource.includes('MC server ping')&&appSource.includes('Path slots'));
   assert.ok(appSource.includes('Next Care Packages')&&appSource.includes('brookeafk.com')&&appSource.includes('care-package-countdown'));
   assert.ok(appSource.includes('PREPARING_EVENT')&&appSource.includes('LIVE TRACKING')&&appSource.includes('CARRIER_DETECTED'));
   assert.ok(appSource.includes('Test Launch Pad')&&appSource.includes('client.testLaunchPad!'));
