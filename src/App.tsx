@@ -49,8 +49,9 @@ function TradePanel({bot,trade,onAction}:{bot:Bot;trade:TradeState;onAction:(tas
     </div>}
   </div>;
 }
-function BotCard({bot,compact,onAction,trade,onLiveView}:{bot:Bot;compact?:boolean;onAction:(task:()=>void|Promise<void>)=>void;trade?:TradeState;onLiveView?:(bot:Bot)=>void}){
+function BotCard({bot,compact,onAction,trade,onLiveView,transport}:{bot:Bot;compact?:boolean;onAction:(task:()=>void|Promise<void>)=>void;trade?:TradeState;onLiveView?:(bot:Bot)=>void;transport?:'mineflayer'|'forge'}){
   const active=bot.state!=='DISCONNECTED'||Boolean(bot.startQueued);
+  const forge=client.mode==='remote'&&transport==='forge';
   return <article className={`bot-card ${compact?'compact':''}`}>
     <div className="bot-main"><div className={`bot-avatar ${tone(bot.state)}`}><BotIcon size={21} strokeWidth={1.8}/></div>
       <div className="bot-identity"><strong>{bot.name}</strong><span className="mono faint">{bot.id} · {bot.instanceId??'No instance'}</span></div>
@@ -60,7 +61,7 @@ function BotCard({bot,compact,onAction,trade,onLiveView}:{bot:Bot;compact?:boole
     </div>}
     {!compact&&<div className="bot-details"><span>Position <b className="mono">{bot.state!=='DISCONNECTED'?`${bot.x.toFixed(1)} / ${bot.y.toFixed(1)} / ${bot.z.toFixed(1)}`:'—'}</b></span><span>Job <b className="mono">{bot.jobId??'—'}</b></span></div>}
     <div className="card-actions">
-      {!active?<button className="mini primary-mini" onClick={()=>onAction(()=>client.startBot(bot.id))}><Play size={15}/> Start</button>:<button className="mini" onClick={()=>onAction(()=>client.stopBot(bot.id))}><Power size={15}/> Stop</button>}
+      {!active?<button className="mini primary-mini" onClick={()=>onAction(()=>client.startBot(bot.id))}><Play size={15}/> {forge?'Attach':'Start'}</button>:<button className="mini" onClick={()=>onAction(()=>client.stopBot(bot.id))}><Power size={15}/> {forge?'Detach':'Stop'}</button>}
       {client.mode==='mock'&&active&&<button className="mini" onClick={()=>onAction(()=>client.recoverBot(bot.id))}><RotateCcw size={15}/> Recover</button>}
       {client.mode==='remote'&&bot.state==='IN_PIT_IDLE'&&<button className="mini launch-test-button" onClick={()=>onAction(()=>client.testLaunchPad!(bot.id))}><ArrowRight size={15}/> Test Launch Pad</button>}
       {client.mode==='remote'&&bot.state==='IN_PIT_IDLE'&&<button className="mini" onClick={()=>onAction(()=>client.testCarePackage!(bot.id))}><Package size={15}/> Test Care Package</button>}
@@ -97,7 +98,10 @@ function App(){
   const go=(v:Page)=>{setPage(v);setMore(false);setFilter('all');setQuery('');window.scrollTo({top:0,behavior:'smooth'});};
   const perform=(task:()=>void|Promise<void>,success='操作を送信しました')=>{void Promise.resolve().then(task).then(()=>setToast(success)).catch(err=>setToast(err instanceof Error?err.message:'操作に失敗しました'))};
   const active=snapshot.bots.filter(b=>b.state!=='DISCONNECTED').length;
+  const forgeMode=client.mode==='remote'&&snapshot.transport==='forge';
   const assignedReadyOffline=snapshot.bots.filter(b=>b.state==='DISCONNECTED'&&!b.startQueued&&snapshot.accounts.some(a=>a.assignedBot===b.id&&a.status==='READY')).length;
+  const forgeAttachable=snapshot.bots.filter(b=>b.state==='DISCONNECTED'&&!b.startQueued).length;
+  const startableOffline=forgeMode?forgeAttachable:assignedReadyOffline;
   const live=snapshot.bots.filter(b=>['IN_PIT_IDLE','PREPARING_EVENT','PATHFINDING','WORKING'].includes(b.state)).length;
   const pending=snapshot.jobs.filter(j=>['QUEUED','ASSIGNED','RUNNING'].includes(j.state)).length;
   const movementDebugLocked=snapshot.bots.some(b=>b.state!=='DISCONNECTED'||Boolean(b.startQueued));
@@ -109,21 +113,22 @@ function App(){
     </aside>
     <div className="mobile-top"><div className="mobile-brand"><span className="brand-mark">B<span>.</span></span><b>BBot</b></div><span className="mobile-mode"><span className="mode-dot"/> {client.mode==='remote'?'REMOTE MODE':'MOCK MODE'}</span></div>
     <main className="content" id="main"><div className="desktop-top"><div className="breadcrumb">WORKSPACE <ChevronRight size={14}/> {current.label.toUpperCase()}</div><div className="top-right"><span className="version-pill">JAVA EDITION <b>1.8.9</b></span><span className="mode-pill"><span className="mode-dot"/> {client.mode==='remote'?'REMOTE MODE':'MOCK MODE'}</span></div></div>
-      <div className="page-head"><div><div className="eyebrow">BBOT / {current.label.toUpperCase()}</div><h1>{page==='dashboard'?'Command center':current.label}</h1><p>{({dashboard:client.mode==='remote'?'実Bot backendを操作・監視する管理画面。':'20クライアントまでを見渡す、Mockの管理画面。',bots:'各Botの状態と操作をまとめて確認。',instances:'発見したPit instanceの状態を確認。',jobs:'イベントの割当と進行状況を確認。',accounts:client.mode==='remote'?'Microsoft / Session Accountの追加とBot割当。':'Session Accountの表示と追加を試す。',settings:client.mode==='remote'?'実Minecraft接続先の設定。':'Mock環境の表示設定と動作値。',logs:client.mode==='remote'?'実Botの操作履歴。':'Mock操作の履歴。秘密情報は記録しません。','chat-debug':client.mode==='remote'?'Minecraftから受信したチャット / systemメッセージをBot別に確認。':'Mockの受信チャット表示。'} as Record<Page,string>)[page]}</p></div>
+      <div className="page-head"><div><div className="eyebrow">BBOT / {current.label.toUpperCase()}</div><h1>{page==='dashboard'?'Command center':current.label}</h1><p>{({dashboard:client.mode==='remote'?'実Bot backendを操作・監視する管理画面。':'20クライアントまでを見渡す、Mockの管理画面。',bots:'各Botの状態と操作をまとめて確認。',instances:'発見したPit instanceの状態を確認。',jobs:'イベントの割当と進行状況を確認。',accounts:client.mode==='remote'?(forgeMode?'Forge workerのMinecraft loginは現在HeadlessMC側で管理します。':'Microsoft / Session Accountの追加とBot割当。'):'Session Accountの表示と追加を試す。',settings:client.mode==='remote'?(forgeMode?'Forge bridgeと実Bot動作の設定。':'実Minecraft接続先の設定。'):'Mock環境の表示設定と動作値。',logs:client.mode==='remote'?'実Botの操作履歴。':'Mock操作の履歴。秘密情報は記録しません。','chat-debug':client.mode==='remote'?'Minecraftから受信したチャット / systemメッセージをBot別に確認。':'Mockの受信チャット表示。'} as Record<Page,string>)[page]}</p></div>
         {page==='bots'&&client.mode==='mock'&&<button className="button accent" disabled={snapshot.bots.length>=20} onClick={()=>perform(()=>{client.updateSettings({maxBots:20});client.createBots(20)},'20 BotのMock状態を生成しました')}><Plus size={17}/> Generate 20 Bots</button>}
         {page==='bots'&&client.mode==='remote'&&<div className="server-actions">
-          <button className="button accent" disabled={assignedReadyOffline===0} onClick={()=>perform(async()=>{await client.startAssignedBots!()},`割当済み ${assignedReadyOffline} BotのStartを予約しました`)}><Play size={17}/> Start Assigned</button>
-          <button className="button outline" disabled={active===0&&!snapshot.bots.some(b=>b.startQueued)} onClick={()=>perform(async()=>{await client.stopAllBots!()},'全Botを停止しました')}><Power size={17}/> Stop All</button>
+          <button className="button accent" disabled={startableOffline===0} onClick={()=>perform(async()=>{await client.startAssignedBots!()},forgeMode?`${forgeAttachable} Forge workerへAttachを開始しました`:`割当済み ${assignedReadyOffline} BotのStartを予約しました`)}><Play size={17}/> {forgeMode?'Attach All':'Start Assigned'}</button>
+          <button className="button outline" disabled={active===0&&!snapshot.bots.some(b=>b.startQueued)} onClick={()=>perform(async()=>{await client.stopAllBots!()},forgeMode?'全Forge workerからDetachしました':'全Botを停止しました')}><Power size={17}/> {forgeMode?'Detach All':'Stop All'}</button>
         </div>}
         {page==='instances'&&client.mode==='mock'&&<button className="button accent" onClick={()=>perform(()=>client.addInstance(),'新しいInstanceを観測しました')}><Plus size={17}/> Add instance</button>}
         {page==='accounts'&&client.mode==='mock'&&<button className="button accent" onClick={()=>setAccountOpen(true)}><Plus size={17}/> Add account</button>}
       </div>
       {client.mode==='remote'&&!snapshot.remoteConnected&&<div className="insight" role="status"><Radio size={18}/><p>backendとの接続待ちです。API_ORIGINとWebSocketプロキシを確認してください。</p></div>}
+      {client.mode==='remote'&&forgeMode&&page==='bots'&&<div className="insight"><CircleHelp size={18}/><p>Forge modeではAttach/Detachは、すでに起動しているlocalhost Forge workerへの接続/切断です。Forgeプロセス自体の起動・終了は次のworker supervisor実装で自動化します。</p></div>}
       {client.mode==='remote'&&page==='jobs'&&<div className="insight"><CircleHelp size={18}/><p>Job投入後、同じinstanceのIdle Botが自動で割り当てられ、Pathfindingを開始します。最初は近い安全な座標で確認してください。</p></div>}
       {page==='dashboard'&&<Dashboard data={snapshot} active={active} live={live} pending={pending} go={go} perform={perform}/>}
       {page==='bots'&&<section className="view-section"><div className="toolbar"><div className="filter-row" role="group" aria-label="Bot絞り込み">{[['all','All'],['active','Active'],['idle','Idle'],['offline','Offline']].map(([v,l])=><button key={v} className={`filter ${filter===v?'is-active':''}`} onClick={()=>setFilter(v)}>{l}</button>)}</div><div className="search-box"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Bot / Instance を検索" aria-label="Bot検索"/></div></div>
         <div className="list-label">FLEET <span>{snapshot.bots.length} / {snapshot.settings.maxBots} BOTS</span></div>
-        <div className="bot-grid">{snapshot.bots.filter(b=>(filter==='all'||filter==='active'&&(b.state!=='DISCONNECTED'||Boolean(b.startQueued))||filter==='offline'&&b.state==='DISCONNECTED'&&!b.startQueued||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.id.includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase()))).map(b=><BotCard key={b.id} bot={b} trade={snapshot.trades[b.id]??client.getTradeState(b.id)} onAction={perform} onLiveView={bot=>setLiveBotId(bot.id)}/>)}</div>
+        <div className="bot-grid">{snapshot.bots.filter(b=>(filter==='all'||filter==='active'&&(b.state!=='DISCONNECTED'||Boolean(b.startQueued))||filter==='offline'&&b.state==='DISCONNECTED'&&!b.startQueued||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.id.includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase()))).map(b=><BotCard key={b.id} bot={b} transport={snapshot.transport} trade={snapshot.trades[b.id]??client.getTradeState(b.id)} onAction={perform} onLiveView={bot=>setLiveBotId(bot.id)}/>)}</div>
         {!snapshot.bots.some(b=>(filter==='all'||filter==='active'&&(b.state!=='DISCONNECTED'||Boolean(b.startQueued))||filter==='offline'&&b.state==='DISCONNECTED'&&!b.startQueued||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase())))&&<Empty title="該当するBotがありません" detail="条件を変更して確認してください。"/>}</section>}
       {page==='instances'&&<section className="view-section"><div className="insight"><Activity size={18}/><p>Instance一覧は固定ではありません。Mockで追加・状態変更を試せます。確認済みの集合であり、総instance数ではありません。</p></div>
         <div className="list-label">OBSERVED INSTANCES <span>{snapshot.instances.length} FOUND</span></div><div className="instance-grid">{snapshot.instances.map(i=><InstanceCard key={i.id} id={i.id} status={i.status} count={snapshot.bots.filter(b=>b.instanceId===i.id).length} lastSeen={i.lastSeen} onAction={perform}/>)}</div></section>}
@@ -146,9 +151,13 @@ function App(){
               <span>Last failure <strong className="mono">{j.lastFailure??'—'}</strong></span>
               <span>Retry <strong>{j.state==='QUEUED'?retryText(j.retryAt):'—'}</strong></span>
             </div></>}</article>)}</div>:<Empty title="Jobはありません" detail={client.mode==='remote'?'観測済みinstanceへManual Jobを投入できます。':'Mock Jobを作成してください。'}/>}</section>}
-      {page==='accounts'&&client.mode==='remote'&&<RemoteAccountsPanel snapshot={snapshot} notify={setToast}/>}
+      {page==='accounts'&&client.mode==='remote'&&(forgeMode
+        ? <section className="view-section"><div className="insight"><ShieldCheck size={20}/><p>Forge modeではMinecraft認証は現在HeadlessMC worker側で行います。このAccounts画面の認証情報はForge workerのloginには使用しません。worker supervisor実装後に1:1のAccount割当へ統合します。</p></div></section>
+        : <RemoteAccountsPanel snapshot={snapshot} notify={setToast}/>)}
       {page==='accounts'&&client.mode==='mock'&&<section className="view-section"><div className="insight"><ShieldCheck size={20}/><p>Session AccountはUIのみ。Mockではtokenを入力・保持せず、Bot本体への認証も行いません。</p></div><div className="list-label">ACCOUNTS <span>{snapshot.accounts.length} ADDED</span></div><div className="account-list">{snapshot.accounts.map(a=><div className="account-row" key={a.id}><div className="account-avatar">{a.label.slice(0,1).toUpperCase()}</div><div><strong>{a.label}</strong><span>{a.kind==='SESSION'?'Session Account':'Microsoft Account'} · {a.status==='UNASSIGNED'?'Unassigned':'Mock ready'}</span></div><span className="account-lock"><ShieldCheck size={16}/><span>No token</span></span></div>)}</div></section>}
-      {page==='settings'&&client.mode==='remote'&&<section className="view-section settings-grid"><ServerConnectionPanel snapshot={snapshot} notify={setToast}/><div className="panel"><div className="panel-icon"><Settings2 size={21}/></div><h2>Movement Debug Mode</h2><p className="muted">ONでBotは接続後、最初のspawnから短いpathfindを繰り返します。/play pit、Job、Care Package処理は実行しません。</p>
+      {page==='settings'&&client.mode==='remote'&&<section className="view-section settings-grid">{forgeMode
+        ? <div className="panel"><div className="panel-icon"><Radio size={21}/></div><h2>Forge Worker Connection</h2><p className="muted">現在はHeadlessMCでForge workerを起動し、Minecraft serverへ接続してからWebのAttachを使います。Server Connection設定はworker supervisor実装後にForge起動先へ接続します。</p></div>
+        : <ServerConnectionPanel snapshot={snapshot} notify={setToast}/>}<div className="panel"><div className="panel-icon"><Settings2 size={21}/></div><h2>Movement Debug Mode</h2><p className="muted">ONでBotは接続後、最初のspawnから短いpathfindを繰り返します。/play pit、Job、Care Package処理は実行しません。</p>
         <div className="setting-row"><div><strong>Connect → Pathfind only</strong><small>{movementDebugLocked?'全BotをStopすると切り替えできます':'Anti-Cheat movement確認用'}</small></div><button role="switch" aria-checked={Boolean(snapshot.movementDebug)} aria-label="Movement Debug Mode" disabled={movementDebugLocked} onClick={()=>perform(()=>client.setMovementDebug!(!snapshot.movementDebug),`Movement Debug Modeを${snapshot.movementDebug?'OFF':'ON'}にしました`)} className={`toggle ${snapshot.movementDebug?'on':''}`}><span/></button></div>
         {snapshot.movementDebug&&<div className="insight" role="status"><Activity size={18}/><p>Debug Mode ON: Startすると接続 → first spawn → 約6 blocksずつpathfindを繰り返します。Stopするまで継続します。</p></div>}
       </div></section>}
