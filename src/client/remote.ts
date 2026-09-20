@@ -1,14 +1,14 @@
 import type { BBotClient, BotState, Snapshot, Settings, InstanceStatus, JobStatus, AccountKind, TradeState, TradeClickRequest, PartyCommandResult, Account, MicrosoftAuthChallenge, SessionAccountInput, FleetActionResult, JobCreateInput, Job } from './types';
 import { defaultServerConnection, type ServerConnection, type ReconnectResult } from './serverConnection';
 
-type Wire = { version:number; transport?:'mineflayer'|'forge'; bots:Array<{id:string;accountId?:string;accountLabel:string;minecraftName?:string;state:BotState;startQueued?:boolean;instanceId?:string;jobId?:string;position?:{x:number;y:number;z:number};kickReason?:string;kickedAt?:number}>;
+type Wire = { version:number; transport?:'mineflayer'|'forge'; forgeWorkers?:Snapshot['forgeWorkers']; bots:Array<{id:string;accountId?:string;accountLabel:string;minecraftName?:string;state:BotState;startQueued?:boolean;instanceId?:string;jobId?:string;position?:{x:number;y:number;z:number};kickReason?:string;kickedAt?:number}>;
   instances:Snapshot['instances'];jobs?:Snapshot['jobs'];performance?:Snapshot['performance'];carePackages?:Snapshot['carePackages'];carePackageTracking?:Snapshot['carePackageTracking'];movementDebug?:boolean;logs:Array<{id:number;at:number;level:string;message:string;botId?:string;instanceId?:string;kickReason?:string;detail?:string}>;chatLogs?:Snapshot['chatLogs'];
   viewer:{botId:string;url:string}|null;accounts?:Snapshot['accounts'];serverConnection?:Snapshot['serverConnection'] };
 const unsupported = ():never => {throw Error('この操作は実Botではまだ利用できません')};
 const idleTrade = ():TradeState => ({status:'IDLE',tradeSessionId:null,targetUsername:null,revision:0,window:null});
 export class RemoteBBotClient implements BBotClient {
   readonly mode='remote' as const;
-  private current:Snapshot={bots:[],instances:[],jobs:[],accounts:[],logs:[],chatLogs:[],settings:{maxBots:1,pathConcurrency:2,eventPollingSeconds:10,debug:false,javaVersion:'1.8.9'},serverConnection:defaultServerConnection,trades:{},revision:0,viewer:null,remoteConnected:false};
+  private current:Snapshot={bots:[],forgeWorkers:[],instances:[],jobs:[],accounts:[],logs:[],chatLogs:[],settings:{maxBots:1,pathConcurrency:2,eventPollingSeconds:10,debug:false,javaVersion:'1.8.9'},serverConnection:defaultServerConnection,trades:{},revision:0,viewer:null,remoteConnected:false};
   private listeners=new Set<()=>void>();
   private socket?:WebSocket;
   private failures=0;
@@ -20,7 +20,7 @@ export class RemoteBBotClient implements BBotClient {
   private apply(data:Wire){
     if(data?.version!==1||!Array.isArray(data.bots)||!Array.isArray(data.instances)||!Array.isArray(data.logs))return;
     const kicks=new Map(data.logs.filter(l=>l.kickReason).map(l=>[l.botId,l.kickReason]));
-    this.current={...this.current,revision:++this.lastRevision,transport:data.transport??this.current.transport,viewer:data.viewer,instances:data.instances,jobs:data.jobs??[],performance:data.performance,carePackages:data.carePackages,carePackageTracking:data.carePackageTracking,movementDebug:Boolean(data.movementDebug),
+    this.current={...this.current,revision:++this.lastRevision,transport:data.transport??this.current.transport,forgeWorkers:data.forgeWorkers??this.current.forgeWorkers,viewer:data.viewer,instances:data.instances,jobs:data.jobs??[],performance:data.performance,carePackages:data.carePackages,carePackageTracking:data.carePackageTracking,movementDebug:Boolean(data.movementDebug),
       settings:{...this.current.settings,maxBots:data.bots.length},
       serverConnection:data.serverConnection??this.current.serverConnection,
       bots:data.bots.map(b=>({id:b.id,accountId:b.accountId??'',name:b.minecraftName??b.accountLabel,state:b.state,startQueued:b.startQueued,instanceId:b.instanceId,jobId:b.jobId,
@@ -39,7 +39,7 @@ export class RemoteBBotClient implements BBotClient {
     socket.onopen=()=>{this.failures=0;this.connected(true)};
     socket.onclose=()=>{if(this.socket!==socket)return;void this.refresh().then(ok=>{if(!ok)this.connected(false)});setTimeout(()=>{this.open()},Math.min(1000*2**this.failures++,10000))};
   }
-  private async action(id:string,name:'connect'|'join-pit'|'disconnect'|'test-launch-pad'|'test-care-package'|'oof'){
+  private async action(id:string,name:'connect'|'launch'|'quit'|'start'|'join-pit'|'disconnect'|'test-launch-pad'|'test-care-package'|'oof'){
     if(!/^bot-[1-9]\d*$/.test(id))throw Error('無効なBot IDです');
     const r=await fetch(`/api/v1/bots/${id}/actions/${name}`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',credentials:'same-origin'});
     const data=await r.json().catch(()=>null) as (Wire|{error?:string}|null);
@@ -48,8 +48,15 @@ export class RemoteBBotClient implements BBotClient {
       if(code==='SESSION_AUTH_REQUIRED')await this.refresh();
       const message=code==='ACCOUNT_REQUIRED'?'AccountがBotに割り当てられていません':
         code==='SESSION_AUTH_REQUIRED'?'Session Tokenが無効または期限切れです。AccountsからReplace Tokenしてください':
+        code==='WORKER_NOT_LAUNCHED'?'先にForgeをLaunchしてください':
+        code==='WORKER_RUNTIME_BUSY'?'現在のPoC runtimeでは別のForge workerが使用中です':
+        code==='WORKER_NOT_BOOTSTRAPPED'?'Forge runtimeが未準備です。bootstrap/buildを確認してください':
+        code==='WORKER_LAUNCH_TIMEOUT'?'ForgeのLaunchがタイムアウトしました':
+        code==='WORKER_LAUNCH_FAILED'?'ForgeのLaunchに失敗しました':
+        code==='SERVER_CONNECT_FAILED'?'Minecraft serverへの接続開始に失敗しました':
+        code==='SERVER_DISCONNECT_FAILED'?'Minecraft serverからの切断に失敗しました':
         code==='INVALID_STATE'?'現在のBot stateでは操作できません':
-        code==='CONFLICT'?'設定変更または認証処理中です。少し待って再試行してください':
+        code==='CONFLICT'?'設定変更または処理中です。少し待って再試行してください':
         r.status===404?'Botが見つかりません':'操作に失敗しました';
       throw Error(message);
     }
@@ -58,7 +65,8 @@ export class RemoteBBotClient implements BBotClient {
   async startBot(id:string){
     const bot=this.current.bots.find(b=>b.id===id);
     if(!bot)throw Error('Botが見つかりません');
-    if(this.current.transport!=='forge'&&!bot.accountId){
+    if(this.current.transport==='forge') return this.action(id,'start');
+    if(!bot.accountId){
       const candidates=this.current.accounts.filter(a=>a.status==='READY'&&(a.assignedBot===undefined||a.assignedBot===id));
       if(candidates.length===1)await this.assignAccount(id,candidates[0]!.id);
       else if(candidates.length===0)throw Error('READYのAccountを追加してからStartしてください');
@@ -67,6 +75,8 @@ export class RemoteBBotClient implements BBotClient {
     return this.action(id,'connect');
   }
   stopBot(id:string){return this.action(id,'disconnect')}
+  launchForge(id:string){return this.action(id,'launch')}
+  quitForge(id:string){return this.action(id,'quit')}
   async startAssignedBots(){
     const r=await fetch('/api/v1/fleet/actions/start-assigned',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',credentials:'same-origin'});
     const data=await r.json().catch(()=>null) as (FleetActionResult|{error?:string}|null);
