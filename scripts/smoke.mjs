@@ -165,6 +165,8 @@ try {
   assert.ok(appSource.includes('PREPARING_EVENT')&&appSource.includes('LIVE TRACKING')&&appSource.includes('CARRIER_DETECTED'));
   assert.ok(appSource.includes('Test Launch Pad')&&appSource.includes('client.testLaunchPad!'));
   assert.ok(appSource.includes('Movement Debug Mode')&&appSource.includes('Connect → Pathfind only')&&appSource.includes('client.setMovementDebug!'));
+  assert.ok(appSource.includes('client.launchForge!')&&appSource.includes('client.quitForge!'));
+  assert.ok(appSource.includes('Launch')&&appSource.includes('Disconnect')&&appSource.includes('Forge Worker'));
   const { RemoteBBotClient } = await server.ssrLoadModule('/src/client/remote.ts');
   const oldWindow=globalThis.window,oldSocket=globalThis.WebSocket,oldFetch=globalThis.fetch;
   const oldLocalStorage=globalThis.localStorage,oldSessionStorage=globalThis.sessionStorage;
@@ -236,6 +238,19 @@ try {
     assert.equal(JSON.stringify(remote.getSnapshot()).includes('TEST_ACCESS'),false);
     assert.equal(JSON.stringify(remote.getSnapshot()).includes('TEST_ACCESS_REPLACED'),false);
     assert.equal(remote.getSnapshot().accounts.find(a=>a.id===sessionAccountId)?.assignedBot,'bot-1');
+
+    wire={...wire,transport:'forge',forgeWorkers:[{botId:'bot-1',phase:'LAUNCHED',bridgePort:3010}],
+      bots:wire.bots.map(b=>b.id==='bot-1'?{...b,state:'DISCONNECTED'}:b)};
+    await remote['refresh']();
+    await remote.launchForge!('bot-1');
+    await remote.startBot('bot-1');
+    await remote.stopBot('bot-1');
+    await remote.quitForge!('bot-1');
+    assert.equal(requests.some(r=>r.path==='/api/v1/bots/bot-1/actions/launch'&&r.options.method==='POST'),true);
+    assert.equal(requests.some(r=>r.path==='/api/v1/bots/bot-1/actions/start'&&r.options.method==='POST'),true);
+    assert.equal(requests.some(r=>r.path==='/api/v1/bots/bot-1/actions/disconnect'&&r.options.method==='POST'),true);
+    assert.equal(requests.some(r=>r.path==='/api/v1/bots/bot-1/actions/quit'&&r.options.method==='POST'),true);
+
     assert.equal(requests.some(r=>r.path==='/api/v1/settings/server'&&r.options.method==='PUT'),true);
     assert.equal(requests.some(r=>r.path==='/api/v1/accounts'&&r.options.method==='POST'),true);
     assert.equal(requests.some(r=>r.path==='/api/v1/fleet/actions/start-assigned'&&r.options.method==='POST'),true);
