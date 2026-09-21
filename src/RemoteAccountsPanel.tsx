@@ -57,6 +57,7 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
         showChallenge(next,popup);
         notify(popup?'Microsoft認証画面を開きました。':'Microsoft認証コードを取得しました。Open Microsoft sign-inを押してください。');
       }else{
+        try{popup?.close()}catch{}
         notify('Accountを追加しました。Sign inから認証を続けてください。');
       }
     }catch(e){
@@ -66,15 +67,17 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
   };
 
   const openSignIn=async(accountId:string,popup?:Window|null)=>{
+    const target=popup??window.open('https://www.microsoft.com/link','bbot-ms-auth','popup,width=640,height=760');
     setBusy(true);setError('');
     try{
       const next=await waitForChallenge(accountId);
       if(!next)throw Error('Microsoft認証案内をまだ取得できません。少し待って再試行してください');
-      const url=showChallenge(next,popup);
-      if(!popup||popup.closed)window.open(url,'_blank','noopener,noreferrer');
-      notify('Microsoft認証画面をコード入力済みで開きました');
-    }catch(e){setError(e instanceof Error?e.message:'Microsoft認証画面を開けませんでした')}
-    finally{setBusy(false)}
+      showChallenge(next,target);
+      notify(target?'Microsoft認証画面を開きました':'Microsoft認証コードを取得しました。Open Microsoft sign-inを押してください。');
+    }catch(e){
+      try{target?.close()}catch{}
+      setError(e instanceof Error?e.message:'Microsoft認証画面を開けませんでした');
+    }finally{setBusy(false)}
   };
 
   const addSession=async()=>{
