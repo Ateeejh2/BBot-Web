@@ -18,7 +18,7 @@ export interface CarePackageSchedule { source:'brookeafk.com'; sourceUrl:string;
 export interface CarePackageTracking { timestamp?:number; instances:Array<{instanceId:string;state:'ARMED'|'STARTED'|'CARRIER_DETECTED'|'LAUNCHING'|'DROPPED'|'CHEST_DETECTED'|'LAUNCH_FAILED';startedAt?:number;area?:string;target?:{x:number;y:number;z:number}}> }
 export interface Account { id:string; label:string; kind:AccountKind; status:'READY'|'UNASSIGNED'|'WAITING_FOR_LOGIN'|'ERROR'; minecraftName?:string; assignedBot?:string; createdAt:number; authError?:'SESSION_TOKEN_INVALID' }
 export interface MicrosoftAuthChallenge { verificationUri:string; userCode:string; expiresAt:number }
-export interface SessionAccountInput { label:string; accessToken:string }
+export interface SessionAccountInput { accessToken:string }
 export interface FleetActionResult { started?:string[]; stopped?:string[]; skipped?:Array<{botId:string;reason:string}> }
 export interface LogEntry { id:number; at:number; level:'INFO'|'WARN'|'ERROR'; message:string; botId?:string; instanceId?:string; jobId?:string }
 export interface ChatLogEntry { id:number; at:number; botId:string; instanceId?:string; channel:string; text:string }
@@ -65,7 +65,7 @@ export interface BBotClient {
   addInstance():void;
   setInstanceStatus(id:string,status:InstanceStatus):void;
   addAccount(label:string,kind:AccountKind):void;
-  addMicrosoftAccount?(label:string):Promise<Account>;
+  addMicrosoftAccount?():Promise<Account>;
   addSessionAccount?(input:SessionAccountInput):Promise<Account>;
   replaceSessionToken?(accountId:string,accessToken:string):Promise<Account>;
   getMicrosoftAuthChallenge?(accountId:string):Promise<MicrosoftAuthChallenge|null>;
