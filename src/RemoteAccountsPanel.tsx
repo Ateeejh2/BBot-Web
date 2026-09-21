@@ -6,7 +6,7 @@ import type { MicrosoftAuthChallenge, Snapshot } from './client/types';
 const delay=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
 
 export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:(message:string)=>void}){
-  const [label,setLabel]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const [busy,setBusy]=useState(false),[error,setError]=useState('');
   const [challenge,setChallenge]=useState<MicrosoftAuthChallenge|null>(null);
   const [kind,setKind]=useState<'MICROSOFT'|'SESSION'>('MICROSOFT');
   const [replaceAccountId,setReplaceAccountId]=useState<string|null>(null);
@@ -46,28 +46,22 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
   };
 
   const add=async()=>{
-    const popup=window.open('about:blank','bbot-ms-auth','popup,width=640,height=760');
+    // Open a real Microsoft page directly from the click gesture. Opening
+    // about:blank first is blocked by some browsers / hosted dev previews.
+    const popup=window.open('https://www.microsoft.com/link','bbot-ms-auth','popup,width=640,height=760');
+    setKind('MICROSOFT');setBusy(true);setError('');setChallenge(null);
     try{
-      if(popup){
-        popup.document.title='Microsoft sign-in';
-        popup.document.body.textContent='Preparing Microsoft sign-in...';
-      }
-    }catch{/* Popup may be isolated by the browser. */}
-    setBusy(true);setError('');setChallenge(null);
-    try{
-      const account=await client.addMicrosoftAccount!(label);
-      setLabel('');
+      const account=await client.addMicrosoftAccount!();
       const next=await waitForChallenge(account.id);
       if(next){
         showChallenge(next,popup);
-        notify('Microsoft認証画面をコード入力済みで開きました。');
+        notify(popup?'Microsoft認証画面を開きました。':'Microsoft認証コードを取得しました。Open Microsoft sign-inを押してください。');
       }else{
-        try{popup?.close()}catch{}
-        notify('Accountを追加しました。PendingのSign inを押してください。');
+        notify('Accountを追加しました。Sign inから認証を続けてください。');
       }
     }catch(e){
       try{popup?.close()}catch{}
-      setError(e instanceof Error?e.message:'Accountの追加に失敗しました');
+      setError(e instanceof Error?e.message:'Microsoft Accountの追加に失敗しました');
     }finally{setBusy(false)}
   };
 
@@ -84,12 +78,12 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
   };
 
   const addSession=async()=>{
-    const input={label,accessToken:accessToken.current?.value??''};
+    const token=accessToken.current?.value.trim()??'';
+    if(!token){setError('Minecraft Access Tokenを入力してください');return}
     if(accessToken.current)accessToken.current.value='';
     setBusy(true);setError('');
     try{
-      const account=await client.addSessionAccount!(input);
-      setLabel('');
+      const account=await client.addSessionAccount!({accessToken:token});
       notify(`${account.minecraftName??account.label} をSession Accountとして追加しました`);
     }catch(e){
       setError(e instanceof Error?e.message:'Session Accountを追加できませんでした');
@@ -100,7 +94,7 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
     if(!replaceAccountId)return;
     const token=replaceToken.current?.value??'';
     if(replaceToken.current)replaceToken.current.value='';
-    if(!token){setError('Minecraft Session ID / Access Tokenを入力してください');return}
+    if(!token){setError('Minecraft Access Tokenを入力してください');return}
     setBusy(true);setError('');
     try{
       const account=await client.replaceSessionToken!(replaceAccountId,token);
@@ -126,8 +120,7 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
   };
 
   const retry=async(accountId:string)=>{
-    const popup=window.open('about:blank','bbot-ms-auth','popup,width=640,height=760');
-    try{if(popup)popup.document.body.textContent='Preparing Microsoft sign-in...'}catch{}
+    const popup=window.open('https://www.microsoft.com/link','bbot-ms-auth','popup,width=640,height=760');
     setBusy(true);setError('');setChallenge(null);
     try{
       await client.retryAccount!(accountId);
@@ -142,18 +135,18 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
   };
 
   return <section className="view-section"><div className="panel"><h2>Add Account</h2>
-    <div className="server-actions"><button className="button outline" aria-pressed={kind==='MICROSOFT'} onClick={()=>setKind('MICROSOFT')}>Microsoft</button><button className="button outline" aria-pressed={kind==='SESSION'} onClick={()=>setKind('SESSION')}>Session</button></div>
-    {kind==='MICROSOFT'&&<p className="muted">Add Microsoftを押すとMicrosoftのサインイン画面を開きます。Webには短時間だけdevice codeを表示しますが、access tokenやrefresh tokenは送信・保存しません。</p>}
-    <label className="field-label" htmlFor="remote-account-label">Display label</label>
-    <input id="remote-account-label" value={label} maxLength={40} autoComplete="off" onChange={e=>setLabel(e.target.value)} placeholder="Scout_01"/>
+    <div className="server-actions">
+      <button className="button accent" aria-pressed={kind==='MICROSOFT'} disabled={busy} onClick={()=>void add()}>Microsoft</button>
+      <button className="button outline" aria-pressed={kind==='SESSION'} disabled={busy} onClick={()=>setKind('SESSION')}>Session Token</button>
+    </div>
     {kind==='MICROSOFT'?<>
-      <div className="server-actions"><button className="button accent" disabled={busy||!/^\w[\w-]{0,39}$/.test(label)} onClick={()=>void add()}>Add Microsoft</button></div>
-      {challenge&&<div className="token-note" role="status"><div><strong>Microsoft sign-in</strong><div>Code: <code>{challenge.userCode}</code></div><button className="button outline" onClick={()=>window.open(signInUrl(challenge),'_blank','noopener,noreferrer')}><ExternalLink size={15}/> Open Microsoft sign-in</button><small>Microsoftの /link ページでは code をURLの otc パラメータに渡して事前入力します。対応しないverification URIでは通常の認証ページへ戻します。</small></div></div>}
+      <p className="muted">Microsoftを押すと、そのクリックで認証ページを直接開いてdevice-code認証を開始します。Display labelの入力は不要です。</p>
+      {challenge&&<div className="token-note" role="status"><div><strong>Microsoft sign-in</strong><div>Code: <code>{challenge.userCode}</code></div><button className="button outline" onClick={()=>window.open(signInUrl(challenge),'_blank','noopener,noreferrer')}><ExternalLink size={15}/> Open Microsoft sign-in</button><small>ポップアップがブロックされた場合も、このボタンから認証ページを開けます。</small></div></div>}
     </>:<>
-      <label className="field-label" htmlFor="session-access-token">Minecraft Session ID / Access Token</label>
-      <input id="session-access-token" ref={accessToken} type="password" autoComplete="off" maxLength={2200} placeholder="token:&lt;accessToken&gt;:&lt;uuid&gt; または Access Token"/>
-      <div className="server-actions"><button className="button accent" disabled={busy||!/^\w[\w-]{0,39}$/.test(label)} onClick={()=>void addSession()}>Add Session</button></div>
-      <p className="muted">MinecraftのSession ID（token:&lt;accessToken&gt;:&lt;uuid&gt;）またはMinecraft Services Access Tokenを追加できます。backendがProfileを確認し、秘密情報はWebSocket・Logs・runtime metadataには出しません。</p>
+      <label className="field-label" htmlFor="session-access-token">Minecraft Access Token</label>
+      <input id="session-access-token" ref={accessToken} type="password" autoComplete="off" maxLength={2048} placeholder="Access Token"/>
+      <div className="server-actions"><button className="button accent" disabled={busy} onClick={()=>void addSession()}>Add Session</button></div>
+      <p className="muted">Tokenだけ入力します。backendがMinecraft profile APIからMCIDとUUIDを取得してSessionを作成します。TokenはWebSocket・Logs・runtime metadataには出しません。</p>
     </>}
     {error&&<p role="alert" className="server-error">{error}</p>}
   </div>
@@ -175,9 +168,9 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
     </div>
   </div>)}</div>
   {replaceAccountId&&<div className="panel"><h2>Replace Session Token</h2>
-    <p className="muted">同じMinecraft Accountの新しいSession IDまたはAccess Tokenを入力してください。BotをStopし、Forge workerもQuitしてから更新できます。入力値は送信後すぐフォームから消えます。</p>
-    <label className="field-label" htmlFor="session-replace-token">Minecraft Session ID / Access Token</label>
-    <input id="session-replace-token" ref={replaceToken} type="password" autoComplete="off" maxLength={2200}/>
+    <p className="muted">同じMinecraft Accountの新しいAccess Tokenを入力してください。BotをStopし、Forge workerもQuitしてから更新できます。入力値は送信後すぐフォームから消えます。</p>
+    <label className="field-label" htmlFor="session-replace-token">Minecraft Access Token</label>
+    <input id="session-replace-token" ref={replaceToken} type="password" autoComplete="off" maxLength={2048}/>
     <div className="server-actions"><button className="button accent" disabled={busy} onClick={()=>void replaceSessionToken()}>Update Token</button><button className="button outline" disabled={busy} onClick={()=>{if(replaceToken.current)replaceToken.current.value='';setReplaceAccountId(null)}}>Cancel</button></div>
   </div>}
   {snapshot.bots.map(bot=><div className="panel" key={bot.id}><h2>{bot.id} Account assignment</h2>
