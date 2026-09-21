@@ -133,7 +133,7 @@ export class RemoteBBotClient implements BBotClient {
     const data=await r.json().catch(()=>null) as (Account|{error?:string}|null);
     if(!r.ok){
       const code=data&&'error'in data?data.error:undefined;
-      if(code==='INVALID_SESSION_TOKEN')throw Error('Minecraft Session ID / Access Tokenが無効、期限切れ、またはMinecraftプロフィールを取得できません');
+      if(code==='INVALID_SESSION_TOKEN')throw Error('Minecraft Access Tokenが無効、期限切れ、またはMinecraftプロフィールを取得できません');
       throw Error(r.status===400?'Tokenを確認してください':r.status===409?'同じAccountがすでにあります':'Session Accountの追加に失敗しました');
     }
     await this.refresh();
@@ -146,7 +146,7 @@ export class RemoteBBotClient implements BBotClient {
     const data=await r.json().catch(()=>null) as (Account|{error?:string}|null);
     if(!r.ok){
       const code=data&&'error'in data?data.error:undefined;
-      if(code==='INVALID_SESSION_TOKEN')throw Error('Minecraft Session ID / Access Tokenが無効、期限切れ、またはMinecraftプロフィールを取得できません');
+      if(code==='INVALID_SESSION_TOKEN')throw Error('Minecraft Access Tokenが無効、期限切れ、またはMinecraftプロフィールを取得できません');
       if(code==='PROFILE_MISMATCH')throw Error('このTokenは別のMinecraft Accountのものです');
       if(code==='INVALID_STATE')throw Error('使用中のBotをStopしてからTokenを更新してください');
       if(code==='UNKNOWN_ACCOUNT')throw Error('Session Accountが見つかりません');
