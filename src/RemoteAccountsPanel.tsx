@@ -40,7 +40,7 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
     setChallenge(next);
     const url=signInUrl(next);
     try{
-      if(popup&&!popup.closed)popup.location.replace(url);
+      if(popup&&!popup.closed)popup.location.href=url;
     }catch{/* Fallback button remains available in the page. */}
     return url;
   };
