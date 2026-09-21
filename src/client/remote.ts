@@ -48,8 +48,9 @@ export class RemoteBBotClient implements BBotClient {
       if(code==='SESSION_AUTH_REQUIRED')await this.refresh();
       const message=code==='ACCOUNT_REQUIRED'?'AccountがBotに割り当てられていません':
         code==='SESSION_AUTH_REQUIRED'?'Session Tokenが無効または期限切れです。AccountsからReplace Tokenしてください':
+        code==='ACCOUNT_NOT_READY'?'割り当てられたAccountの認証を完了してからLaunchしてください':
+        code==='AUTH_FAILED'?'Microsoft認証の更新に失敗しました。AccountsからRetryしてください':
         code==='WORKER_NOT_LAUNCHED'?'先にForgeをLaunchしてください':
-        code==='WORKER_RUNTIME_BUSY'?'現在のPoC runtimeでは別のForge workerが使用中です':
         code==='WORKER_NOT_BOOTSTRAPPED'?'Forge runtimeが未準備です。bootstrap/buildを確認してください':
         code==='WORKER_LAUNCH_TIMEOUT'?'ForgeのLaunchがタイムアウトしました':
         code==='WORKER_LAUNCH_FAILED'?'ForgeのLaunchに失敗しました':
@@ -75,7 +76,17 @@ export class RemoteBBotClient implements BBotClient {
     return this.action(id,'connect');
   }
   stopBot(id:string){return this.action(id,'disconnect')}
-  launchForge(id:string){return this.action(id,'launch')}
+  async launchForge(id:string){
+    const bot=this.current.bots.find(b=>b.id===id);
+    if(!bot)throw Error('Botが見つかりません');
+    if(!bot.accountId){
+      const candidates=this.current.accounts.filter(a=>a.status==='READY'&&(a.assignedBot===undefined||a.assignedBot===id));
+      if(candidates.length===1)await this.assignAccount(id,candidates[0]!.id);
+      else if(candidates.length===0)throw Error('READYのAccountを追加してからLaunchしてください');
+      else throw Error('Accountsで使用するAccountをBotに割り当ててください');
+    }
+    return this.action(id,'launch');
+  }
   quitForge(id:string){return this.action(id,'quit')}
   async startAssignedBots(){
     const r=await fetch('/api/v1/fleet/actions/start-assigned',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',credentials:'same-origin'});
@@ -122,7 +133,7 @@ export class RemoteBBotClient implements BBotClient {
     const data=await r.json().catch(()=>null) as (Account|{error?:string}|null);
     if(!r.ok){
       const code=data&&'error'in data?data.error:undefined;
-      if(code==='INVALID_SESSION_TOKEN')throw Error('Minecraft Access Tokenが無効、期限切れ、またはMinecraftプロフィールを取得できません');
+      if(code==='INVALID_SESSION_TOKEN')throw Error('Minecraft Session ID / Access Tokenが無効、期限切れ、またはMinecraftプロフィールを取得できません');
       throw Error(r.status===400?'入力を確認してください':r.status===409?'同じlabelのAccountがあります':'Session Accountの追加に失敗しました');
     }
     await this.refresh();
@@ -135,7 +146,7 @@ export class RemoteBBotClient implements BBotClient {
     const data=await r.json().catch(()=>null) as (Account|{error?:string}|null);
     if(!r.ok){
       const code=data&&'error'in data?data.error:undefined;
-      if(code==='INVALID_SESSION_TOKEN')throw Error('Minecraft Access Tokenが無効、期限切れ、またはMinecraftプロフィールを取得できません');
+      if(code==='INVALID_SESSION_TOKEN')throw Error('Minecraft Session ID / Access Tokenが無効、期限切れ、またはMinecraftプロフィールを取得できません');
       if(code==='PROFILE_MISMATCH')throw Error('このTokenは別のMinecraft Accountのものです');
       if(code==='INVALID_STATE')throw Error('使用中のBotをStopしてからTokenを更新してください');
       if(code==='UNKNOWN_ACCOUNT')throw Error('Session Accountが見つかりません');
