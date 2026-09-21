@@ -100,7 +100,7 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
     if(!replaceAccountId)return;
     const token=replaceToken.current?.value??'';
     if(replaceToken.current)replaceToken.current.value='';
-    if(!token){setError('Minecraft Access Tokenを入力してください');return}
+    if(!token){setError('Minecraft Session ID / Access Tokenを入力してください');return}
     setBusy(true);setError('');
     try{
       const account=await client.replaceSessionToken!(replaceAccountId,token);
@@ -181,9 +181,9 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
     <div className="server-actions"><button className="button accent" disabled={busy} onClick={()=>void replaceSessionToken()}>Update Token</button><button className="button outline" disabled={busy} onClick={()=>{if(replaceToken.current)replaceToken.current.value='';setReplaceAccountId(null)}}>Cancel</button></div>
   </div>}
   {snapshot.bots.map(bot=><div className="panel" key={bot.id}><h2>{bot.id} Account assignment</h2>
-    <p className="muted">{bot.startQueued?'Start待ちです。StopでQueueをキャンセルしてからAccountを変更できます。':bot.state==='DISCONNECTED'?'停止中にAccountを選択できます。':`現在 ${bot.state}。Stop後に変更できます。`}</p>
+    <p className="muted">{botUnavailable(bot.id)?'BotをStopし、Forge modeではworkerもQuitしてからAccountを変更できます。':'停止中にAccountを選択できます。'}</p>
     <label className="field-label" htmlFor={`assign-${bot.id}`}>Assigned Account</label>
-    <select id={`assign-${bot.id}`} value={bot.accountId} disabled={busy||bot.state!=='DISCONNECTED'||Boolean(bot.startQueued)} onChange={e=>void assign(bot.id,e.target.value||null)}>
+    <select id={`assign-${bot.id}`} value={bot.accountId} disabled={busy||botUnavailable(bot.id)} onChange={e=>void assign(bot.id,e.target.value||null)}>
       <option value="">Unassigned</option>
       {snapshot.accounts.filter(a=>a.status==='READY'&&(a.assignedBot===undefined||a.assignedBot===bot.id)).map(a=><option key={a.id} value={a.id}>{a.minecraftName??a.label}</option>)}
     </select>
