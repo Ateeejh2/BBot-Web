@@ -11,7 +11,10 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
   const [kind,setKind]=useState<'MICROSOFT'|'SESSION'>('MICROSOFT');
   const [replaceAccountId,setReplaceAccountId]=useState<string|null>(null);
   const accessToken=useRef<HTMLInputElement>(null),replaceToken=useRef<HTMLInputElement>(null);
-  const botUnavailable=(botId?:string)=>Boolean(botId&&snapshot.bots.some(bot=>bot.id===botId&&(bot.state!=='DISCONNECTED'||Boolean(bot.startQueued))));
+  const botUnavailable=(botId?:string)=>Boolean(botId&&(
+    snapshot.bots.some(bot=>bot.id===botId&&(bot.state!=='DISCONNECTED'||Boolean(bot.startQueued)))||
+    snapshot.forgeWorkers?.some(worker=>worker.botId===botId&&worker.phase!=='STOPPED')
+  ));
 
   const waitForChallenge=async(accountId:string)=>{
     for(let i=0;i<40;i++){
@@ -115,7 +118,7 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
   };
 
   const remove=async(accountId:string,accountLabel:string,accountKind:'MICROSOFT'|'SESSION')=>{
-    if(!window.confirm(`${accountLabel} をBBotから削除しますか？\nBotが使用中の場合は削除できません。${accountKind==='SESSION'?'Session credentialも削除されます。':'Microsoft認証キャッシュは残ります。'}`))return;
+    if(!window.confirm(`${accountLabel} をBBotから削除しますか？\nBotまたはForge workerが使用中の場合は削除できません。${accountKind==='SESSION'?'Session credentialも削除されます。':'Microsoft認証キャッシュも削除されます。'}`))return;
     setBusy(true);setError('');
     try {await client.deleteAccount!(accountId);if(challenge)setChallenge(null);notify(`${accountLabel} を削除しました`)}
     catch(e){setError(e instanceof Error?e.message:'Accountの削除に失敗しました')}
@@ -147,10 +150,10 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
       <div className="server-actions"><button className="button accent" disabled={busy||!/^\w[\w-]{0,39}$/.test(label)} onClick={()=>void add()}>Add Microsoft</button></div>
       {challenge&&<div className="token-note" role="status"><div><strong>Microsoft sign-in</strong><div>Code: <code>{challenge.userCode}</code></div><button className="button outline" onClick={()=>window.open(signInUrl(challenge),'_blank','noopener,noreferrer')}><ExternalLink size={15}/> Open Microsoft sign-in</button><small>Microsoftの /link ページでは code をURLの otc パラメータに渡して事前入力します。対応しないverification URIでは通常の認証ページへ戻します。</small></div></div>}
     </>:<>
-      <label className="field-label" htmlFor="session-access-token">Minecraft Access Token</label>
-      <input id="session-access-token" ref={accessToken} type="password" autoComplete="off" maxLength={2048}/>
+      <label className="field-label" htmlFor="session-access-token">Minecraft Session ID / Access Token</label>
+      <input id="session-access-token" ref={accessToken} type="password" autoComplete="off" maxLength={2200} placeholder="token:&lt;accessToken&gt;:&lt;uuid&gt; または Access Token"/>
       <div className="server-actions"><button className="button accent" disabled={busy||!/^\w[\w-]{0,39}$/.test(label)} onClick={()=>void addSession()}>Add Session</button></div>
-      <p className="muted">Minecraft ServicesのAccess Tokenだけで追加できます。backendがそのtokenでMCIDとProfile UUIDを取得し、token自体はWebSocket・Logs・runtime metadataには出しません。</p>
+      <p className="muted">MinecraftのSession ID（token:&lt;accessToken&gt;:&lt;uuid&gt;）またはMinecraft Services Access Tokenを追加できます。backendがProfileを確認し、秘密情報はWebSocket・Logs・runtime metadataには出しません。</p>
     </>}
     {error&&<p role="alert" className="server-error">{error}</p>}
   </div>
@@ -166,15 +169,15 @@ export function RemoteAccountsPanel({snapshot,notify}:{snapshot:Snapshot;notify:
         account.kind==='SESSION'&&account.status==='ERROR'?<span className="account-lock">Auth error</span>:
         <span className="account-lock">Ready</span>}
       {account.kind==='SESSION'&&<button className="mini" disabled={busy||botUnavailable(account.assignedBot)} onClick={()=>{setError('');setReplaceAccountId(account.id)}}>Replace Token</button>}
-      <button className="mini" disabled={busy||botUnavailable(account.assignedBot)} onClick={()=>void remove(account.id,account.label,account.kind)} title={botUnavailable(account.assignedBot)?'使用中またはStart待ちのBotをStopしてから削除してください':'Accountを削除'}>
+      <button className="mini" disabled={busy||botUnavailable(account.assignedBot)} onClick={()=>void remove(account.id,account.label,account.kind)} title={botUnavailable(account.assignedBot)?'BotをStopし、Forge workerをQuitしてから削除してください':'Accountを削除'}>
         <Trash2 size={14}/> Delete
       </button>
     </div>
   </div>)}</div>
   {replaceAccountId&&<div className="panel"><h2>Replace Session Token</h2>
-    <p className="muted">同じMinecraft Accountの新しいAccess Tokenを入力してください。Botが稼働中の場合は先にStopしてください。Tokenは送信後すぐフォームから消えます。</p>
-    <label className="field-label" htmlFor="session-replace-token">Minecraft Access Token</label>
-    <input id="session-replace-token" ref={replaceToken} type="password" autoComplete="off" maxLength={2048}/>
+    <p className="muted">同じMinecraft Accountの新しいSession IDまたはAccess Tokenを入力してください。BotをStopし、Forge workerもQuitしてから更新できます。入力値は送信後すぐフォームから消えます。</p>
+    <label className="field-label" htmlFor="session-replace-token">Minecraft Session ID / Access Token</label>
+    <input id="session-replace-token" ref={replaceToken} type="password" autoComplete="off" maxLength={2200}/>
     <div className="server-actions"><button className="button accent" disabled={busy} onClick={()=>void replaceSessionToken()}>Update Token</button><button className="button outline" disabled={busy} onClick={()=>{if(replaceToken.current)replaceToken.current.value='';setReplaceAccountId(null)}}>Cancel</button></div>
   </div>}
   {snapshot.bots.map(bot=><div className="panel" key={bot.id}><h2>{bot.id} Account assignment</h2>
