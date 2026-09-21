@@ -122,8 +122,8 @@ export class RemoteBBotClient implements BBotClient {
     const record=await this.request('/api/v1/settings/server','PUT',next) as Snapshot['serverConnection'];
     this.current={...this.current,serverConnection:record};this.listeners.forEach(listener=>listener());return record;
   }
-  async addMicrosoftAccount(label:string){
-    const account=await this.request('/api/v1/accounts','POST',{kind:'MICROSOFT',label}) as Account;
+  async addMicrosoftAccount(){
+    const account=await this.request('/api/v1/accounts','POST',{kind:'MICROSOFT'}) as Account;
     await this.refresh();
     return account;
   }
@@ -134,7 +134,7 @@ export class RemoteBBotClient implements BBotClient {
     if(!r.ok){
       const code=data&&'error'in data?data.error:undefined;
       if(code==='INVALID_SESSION_TOKEN')throw Error('Minecraft Session ID / Access Tokenが無効、期限切れ、またはMinecraftプロフィールを取得できません');
-      throw Error(r.status===400?'入力を確認してください':r.status===409?'同じlabelのAccountがあります':'Session Accountの追加に失敗しました');
+      throw Error(r.status===400?'Tokenを確認してください':r.status===409?'同じAccountがすでにあります':'Session Accountの追加に失敗しました');
     }
     await this.refresh();
     return data as Account;
