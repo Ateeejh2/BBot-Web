@@ -2,7 +2,7 @@ import type { BBotClient, BotState, Snapshot, Settings, InstanceStatus, JobStatu
 import { defaultServerConnection, type ServerConnection, type ReconnectResult } from './serverConnection';
 
 type Wire = { version:number; transport?:'mineflayer'|'forge'; forgeWorkers?:Snapshot['forgeWorkers']; bots:Array<{id:string;accountId?:string;accountLabel:string;minecraftName?:string;state:BotState;startQueued?:boolean;instanceId?:string;jobId?:string;position?:{x:number;y:number;z:number};kickReason?:string;kickedAt?:number;activity?:{kind:'SCANNING_CHUNKS';progress:number}}>;
-  instances:Snapshot['instances'];jobs?:Snapshot['jobs'];performance?:Snapshot['performance'];carePackages?:Snapshot['carePackages'];carePackageTracking?:Snapshot['carePackageTracking'];movementDebug?:boolean;logs:Array<{id:number;at:number;level:string;message:string;botId?:string;instanceId?:string;kickReason?:string;detail?:string}>;chatLogs?:Snapshot['chatLogs'];
+  instances:Snapshot['instances'];jobs?:Snapshot['jobs'];performance?:Snapshot['performance'];networkIdentity?:Snapshot['networkIdentity'];carePackages?:Snapshot['carePackages'];carePackageTracking?:Snapshot['carePackageTracking'];movementDebug?:boolean;logs:Array<{id:number;at:number;level:string;message:string;botId?:string;instanceId?:string;kickReason?:string;detail?:string}>;chatLogs?:Snapshot['chatLogs'];
   viewer:{botId:string;url:string}|null;accounts?:Snapshot['accounts'];serverConnection?:Snapshot['serverConnection'] };
 const unsupported = ():never => {throw Error('この操作は実Botではまだ利用できません')};
 const idleTrade = ():TradeState => ({status:'IDLE',tradeSessionId:null,targetUsername:null,revision:0,window:null});
@@ -20,7 +20,7 @@ export class RemoteBBotClient implements BBotClient {
   private apply(data:Wire){
     if(data?.version!==1||!Array.isArray(data.bots)||!Array.isArray(data.instances)||!Array.isArray(data.logs))return;
     const kicks=new Map(data.logs.filter(l=>l.kickReason).map(l=>[l.botId,l.kickReason]));
-    this.current={...this.current,revision:++this.lastRevision,transport:data.transport??this.current.transport,forgeWorkers:data.forgeWorkers??this.current.forgeWorkers,viewer:data.viewer,instances:data.instances,jobs:data.jobs??[],performance:data.performance,carePackages:data.carePackages,carePackageTracking:data.carePackageTracking,movementDebug:Boolean(data.movementDebug),
+    this.current={...this.current,revision:++this.lastRevision,transport:data.transport??this.current.transport,forgeWorkers:data.forgeWorkers??this.current.forgeWorkers,viewer:data.viewer,instances:data.instances,jobs:data.jobs??[],performance:data.performance,networkIdentity:data.networkIdentity,carePackages:data.carePackages,carePackageTracking:data.carePackageTracking,movementDebug:Boolean(data.movementDebug),
       settings:{...this.current.settings,maxBots:data.bots.length},
       serverConnection:data.serverConnection??this.current.serverConnection,
       bots:data.bots.map(b=>({id:b.id,accountId:b.accountId??'',name:b.minecraftName??b.accountLabel,state:b.state,startQueued:b.startQueued,instanceId:b.instanceId,jobId:b.jobId,
