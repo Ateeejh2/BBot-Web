@@ -15,7 +15,18 @@ export interface RuntimePerformance { cpuPercent:number; rssMb:number; heapUsedM
 export interface BotPathPerformance { botId:string; pingMs?:number; pathAttempts:number; pathCompleted:number; pathFailed:number; activePathMs?:number; lastPathMs?:number; lastPathQueueMs?:number }
 export interface PerformanceSnapshot { runtime:RuntimePerformance; pathfinding:{active:number;queued:number;concurrency:number;bots:BotPathPerformance[]} }
 export interface NetworkIdentityPoint { ip:string; countryCode?:string; region?:string; city?:string; asn?:number; organization?:string; observedAt:number }
-export interface NetworkIdentitySnapshot { status:'CHECKING'|'OK'|'UNAVAILABLE'; current?:NetworkIdentityPoint; previous?:NetworkIdentityPoint; changed:boolean; checkedAt?:number }
+export type NetworkIdentityRiskLevel = 'Safe'|'Cauction'|'Warning'|'Dangerous'|'Unknown';
+export interface NetworkIdentityChanges { ip:boolean; asn:boolean; country:boolean; region:boolean; city:boolean }
+export interface NetworkIdentityRisk { score?:number; level:NetworkIdentityRiskLevel; reasons:string[] }
+export interface NetworkIdentitySnapshot {
+  status:'CHECKING'|'OK'|'UNAVAILABLE';
+  current?:NetworkIdentityPoint;
+  previous?:NetworkIdentityPoint;
+  changed:boolean;
+  changes?:NetworkIdentityChanges;
+  risk:NetworkIdentityRisk;
+  checkedAt?:number;
+}
 export interface CarePackageSchedule { source:'brookeafk.com'; sourceUrl:string; updatedAt?:number; status:'OK'|'STALE'|'UNAVAILABLE'; events:Array<{timestamp:number}> }
 export interface CarePackageTracking { timestamp?:number; instances:Array<{instanceId:string;state:'ARMED'|'STARTED'|'CARRIER_DETECTED'|'LAUNCHING'|'DROPPED'|'CHEST_DETECTED'|'LAUNCH_FAILED';startedAt?:number;area?:string;target?:{x:number;y:number;z:number}}> }
 export interface Account { id:string; label:string; kind:AccountKind; status:'READY'|'UNASSIGNED'|'WAITING_FOR_LOGIN'|'ERROR'; minecraftName?:string; assignedBot?:string; createdAt:number; authError?:'SESSION_TOKEN_INVALID' }
