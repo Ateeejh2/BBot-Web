@@ -31,7 +31,7 @@
 @media(max-width:420px){.care-package-list{grid-template-columns:1fr}.care-package-row{grid-template-columns:auto auto minmax(0,1fr) auto;grid-template-rows:auto}.care-package-icon{grid-row:1}.care-package-countdown{grid-column:4;grid-row:1;margin-top:0}.care-package-row>div small{margin-top:2px}}
 /* Public egress identity */
 .network-identity-panel{margin:0 0 16px;transition:border-color .2s,background .2s}
-.network-identity-panel.risk-cauction{border-color:#725832;background:linear-gradient(135deg,#211f1d 0%,#171e28 72%)}
+.network-identity-panel.risk-caution{border-color:#725832;background:linear-gradient(135deg,#211f1d 0%,#171e28 72%)}
 .network-identity-panel.risk-warning{border-color:#865332;background:linear-gradient(135deg,#241d1a 0%,#171e28 72%)}
 .network-identity-panel.risk-dangerous{border-color:#8b3f47;background:linear-gradient(135deg,#27191d 0%,#171e28 72%)}
 .network-identity-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:14px}
@@ -41,13 +41,13 @@
 .network-risk>strong small{font:700 .68rem 'DM Sans',sans-serif;color:#72899b;letter-spacing:0;margin-left:2px}
 .network-risk-level{display:inline-flex;align-items:center;gap:6px;border-radius:7px;padding:7px 9px;font-size:.68rem;font-weight:900;letter-spacing:.045em;white-space:nowrap;border:1px solid transparent}
 .network-risk-level.safe{background:#1e4439;color:#89ebc0;border-color:#315f51}
-.network-risk-level.cauction{background:#5a4020;color:#ffd18a;border-color:#8a6331}
+.network-risk-level.caution{background:#5a4020;color:#ffd18a;border-color:#8a6331}
 .network-risk-level.warning{background:#5a341f;color:#ffb67d;border-color:#8b5734}
 .network-risk-level.dangerous{background:#572a30;color:#ff9ca6;border-color:#8d4049}
 .network-risk-level.unknown{background:#263747;color:#9fb2c0;border-color:#3a5063}
 .network-identity-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
 .network-identity-grid>div{background:#132233;border:1px solid #294052;border-radius:11px;padding:12px 13px;min-width:0}
-.network-identity-panel.risk-cauction .network-identity-grid>div,.network-identity-panel.risk-warning .network-identity-grid>div,.network-identity-panel.risk-dangerous .network-identity-grid>div{background:#1b232d}
+.network-identity-panel.risk-caution .network-identity-grid>div,.network-identity-panel.risk-warning .network-identity-grid>div,.network-identity-panel.risk-dangerous .network-identity-grid>div{background:#1b232d}
 .network-identity-grid span{display:block;color:#8297aa;font-size:.7rem;font-weight:700}
 .network-identity-grid strong{display:block;color:#e6f0f2;font-size:.9rem;margin-top:5px;overflow-wrap:anywhere}
 .network-identity-grid small{display:block;color:#70879a;font-size:.67rem;line-height:1.4;margin-top:3px;overflow-wrap:anywhere}
