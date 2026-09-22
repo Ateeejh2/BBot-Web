@@ -161,6 +161,7 @@ try {
   assert.ok(appSource.includes('Submit Job')&&appSource.includes('client.submitJob!'));
   assert.ok(appSource.includes('Attempts')&&appSource.includes('Last failure')&&appSource.includes('Retry'));
   assert.ok(appSource.includes('Forge CPU')&&appSource.includes('Forge RSS memory')&&appSource.includes('Backend event loop p99')&&appSource.includes('MC server ping')&&appSource.includes('Path slots'));
+  assert.ok(appSource.includes('Public network identity')&&appSource.includes('Current public IP')&&appSource.includes('Previous public IP')&&appSource.includes('CAUTION — public network identity changed'));
   assert.ok(appSource.includes('Next Care Packages')&&appSource.includes('brookeafk.com')&&appSource.includes('care-package-countdown'));
   assert.ok(appSource.includes('PREPARING_EVENT')&&appSource.includes('LIVE TRACKING')&&appSource.includes('CARRIER_DETECTED'));
   assert.ok(appSource.includes('Test Launch Pad')&&appSource.includes('client.testLaunchPad!'));
@@ -173,7 +174,7 @@ try {
   let browserWrites=0;
   const sessionAccountId='33333333-3333-4333-8333-333333333333';
   const requests=[];let wire={version:1,bots:[{id:'bot-1',accountId:'account-1',accountLabel:'Scout',state:'DISCONNECTED'}],
-    instances:[{id:'mega-a',status:'ACTIVE',firstSeen:0,lastSeen:0}],jobs:[],carePackages:{source:'brookeafk.com',sourceUrl:'https://brookeafk.com/',updatedAt:Date.now(),status:'OK',events:[1,2,3,4,5].map(n=>({timestamp:Date.now()+n*60000}))},carePackageTracking:{timestamp:Date.now()+60000,instances:[{instanceId:'mega-a',state:'LAUNCHING',target:{x:80,y:110,z:-30}}]},performance:{runtime:{cpuPercent:12.5,rssMb:128,heapUsedMb:64,heapTotalMb:96,eventLoopMeanMs:2,eventLoopP99Ms:4,eventLoopMaxMs:7,uptimeSeconds:10},pathfinding:{active:0,queued:0,concurrency:2,bots:[{botId:'bot-1',pingMs:87,pathAttempts:1,pathCompleted:1,pathFailed:0,lastPathMs:250,lastPathQueueMs:3}]}},logs:[],viewer:null,accounts:remoteSnapshot.accounts,serverConnection:remoteSnapshot.serverConnection};
+    instances:[{id:'mega-a',status:'ACTIVE',firstSeen:0,lastSeen:0}],jobs:[],networkIdentity:{status:'OK',changed:true,checkedAt:Date.now(),current:{ip:'203.0.113.20',asn:64501,organization:'Example Cloud',countryCode:'JP',region:'Tokyo',city:'Tokyo',observedAt:Date.now()},previous:{ip:'203.0.113.10',asn:64500,organization:'Previous Cloud',countryCode:'JP',region:'Osaka',city:'Osaka',observedAt:Date.now()-60000}},carePackages:{source:'brookeafk.com',sourceUrl:'https://brookeafk.com/',updatedAt:Date.now(),status:'OK',events:[1,2,3,4,5].map(n=>({timestamp:Date.now()+n*60000}))},carePackageTracking:{timestamp:Date.now()+60000,instances:[{instanceId:'mega-a',state:'LAUNCHING',target:{x:80,y:110,z:-30}}]},performance:{runtime:{cpuPercent:12.5,rssMb:128,heapUsedMb:64,heapTotalMb:96,eventLoopMeanMs:2,eventLoopP99Ms:4,eventLoopMaxMs:7,uptimeSeconds:10},pathfinding:{active:0,queued:0,concurrency:2,bots:[{botId:'bot-1',pingMs:87,pathAttempts:1,pathCompleted:1,pathFailed:0,lastPathMs:250,lastPathQueueMs:3}]}},logs:[],viewer:null,accounts:remoteSnapshot.accounts,serverConnection:remoteSnapshot.serverConnection};
   try{
     let failNextStart=false;
     globalThis.window={location:{href:'http://localhost:5173/'},setInterval:()=>0};
@@ -211,6 +212,9 @@ try {
     const remote=new RemoteBBotClient();await new Promise(resolve=>setTimeout(resolve,0));
     assert.equal(remote.getServerConnection().host,'play.example.com');
     assert.equal(remote.getSnapshot().performance?.runtime.cpuPercent,12.5);
+    assert.equal(remote.getSnapshot().networkIdentity?.current?.ip,'203.0.113.20');
+    assert.equal(remote.getSnapshot().networkIdentity?.previous?.ip,'203.0.113.10');
+    assert.equal(remote.getSnapshot().networkIdentity?.changed,true);
     assert.equal(remote.getSnapshot().performance?.pathfinding.bots[0]?.pingMs,87);
     assert.equal(remote.getSnapshot().performance?.pathfinding.bots[0]?.lastPathMs,250);
     assert.equal(remote.getSnapshot().carePackages?.source,'brookeafk.com');
