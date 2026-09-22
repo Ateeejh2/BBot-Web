@@ -127,6 +127,7 @@ try {
   assert.deepEqual(commands,[['bot-02','/p ExamplePlayer'],['bot-01','/p warp']]);
   const html=renderToString(createElement(App));
   assert.ok(html.includes('Command center')&&html.includes('Java 1.8.9'));
+  assert.ok(html.includes('Connection network diagnostic')&&html.includes('Current Public IP')&&html.includes('Risk')&&html.includes('Unknown'));
   const serverHtml=renderToString(createElement(ServerConnectionPanel,{snapshot:configClient.getSnapshot(),notify:()=>{}}));
   assert.ok(serverHtml.includes('Server Connection')&&serverHtml.includes('Minecraft Version')&&serverHtml.includes('Save &amp; Reconnect'));
   const remoteSnapshot={...configClient.getSnapshot(),bots:[{id:'bot-1',accountId:'account-1',name:'Scout',state:'DISCONNECTED',x:0,y:0,z:0,updatedAt:0}],
@@ -161,7 +162,9 @@ try {
   assert.ok(appSource.includes('Submit Job')&&appSource.includes('client.submitJob!'));
   assert.ok(appSource.includes('Attempts')&&appSource.includes('Last failure')&&appSource.includes('Retry'));
   assert.ok(appSource.includes('Forge CPU')&&appSource.includes('Forge RSS memory')&&appSource.includes('Backend event loop p99')&&appSource.includes('MC server ping')&&appSource.includes('Path slots'));
-  assert.ok(appSource.includes('Public network identity')&&appSource.includes('Current public IP')&&appSource.includes('Previous public IP')&&appSource.includes('Risk factors'));
+  assert.ok(appSource.includes('Connection network diagnostic')&&appSource.includes('Current Public IP')&&appSource.includes('ASN')&&appSource.includes('Country / Region')&&appSource.includes('Previous Public IP')&&appSource.includes('IP changed')&&appSource.includes('Last checked')&&appSource.includes('Recent changes')&&appSource.includes('Risk factors'));
+  assert.ok(appSource.includes('Hypixel公式のSecurity Block判定やban確率を再現したものではありません'));
+  assert.ok(appSource.includes("status:'UNAVAILABLE'")&&appSource.includes("level:'Unknown'"));
   assert.ok(appSource.includes('Next Care Packages')&&appSource.includes('brookeafk.com')&&appSource.includes('care-package-countdown'));
   assert.ok(appSource.includes('PREPARING_EVENT')&&appSource.includes('LIVE TRACKING')&&appSource.includes('CARRIER_DETECTED'));
   assert.ok(appSource.includes('Test Launch Pad')&&appSource.includes('client.testLaunchPad!'));
