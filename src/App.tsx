@@ -201,27 +201,32 @@ function CarePackagePanel({schedule,tracking}:{schedule:NonNullable<Snapshot['ca
 }
 function NetworkIdentityPanel({identity}:{identity:NonNullable<Snapshot['networkIdentity']>}){
   const current=identity.current,previous=identity.previous;
-  const location=current?[current.city,current.region,current.countryCode].filter(Boolean).join(' · '):'—';
-  const previousLocation=previous?[previous.city,previous.region,previous.countryCode].filter(Boolean).join(' · '):'—';
+  const countryRegion=current?([current.country??current.countryCode,current.region].filter(Boolean).join(' · ')||'—'):'—';
+  const previousCountryRegion=previous?([previous.country??previous.countryCode,previous.region].filter(Boolean).join(' · ')||'—'):'—';
   const level=identity.risk?.level??'Unknown',score=identity.risk?.score;
   const riskClass=level.toLowerCase();
-  const comparison=identity.status==='UNAVAILABLE'
-    ?'Current lookup unavailable'
-    :!previous
-      ?'No previous baseline'
-      :identity.changed
-        ?'Changed since previous check'
-        :'Matches previous check';
+  const ipChanged=identity.status==='OK'&&previous
+    ?identity.ipChanged??identity.changes?.ip??(current?.ip!==undefined&&current.ip!==previous.ip)
+    :undefined;
+  const shortWindowHours=identity.recentChanges?Math.round(identity.recentChanges.windowMs/3_600_000):6;
+  const comparison=identity.status==='CHECKING'
+    ?'Checking backend network identity'
+    :identity.status==='UNAVAILABLE'
+      ?'Current backend lookup unavailable'
+      :!previous
+        ?'No previous baseline'
+        :identity.changed
+          ?'Changed since previous check'
+          :'Matches previous check';
   const changes=[
     ['IP',identity.changes?.ip],
     ['ASN',identity.changes?.asn],
     ['Country',identity.changes?.country],
-    ['Region',identity.changes?.region],
-    ['City',identity.changes?.city]
+    ['Region',identity.changes?.region]
   ] as const;
   return <section className={`panel network-identity-panel risk-${riskClass}`}>
     <div className="network-identity-head">
-      <div><span className="eyebrow">EGRESS NETWORK</span><h2>Public network identity</h2></div>
+      <div><span className="eyebrow">EGRESS NETWORK</span><h2>Connection network diagnostic</h2></div>
       <div className="network-risk">
         <span className={`network-risk-level ${riskClass}`}>
           {level==='Safe'?<ShieldCheck size={15}/>:level==='Unknown'?<CircleHelp size={15}/>:<AlertTriangle size={15}/>} {level}
@@ -230,10 +235,14 @@ function NetworkIdentityPanel({identity}:{identity:NonNullable<Snapshot['network
       </div>
     </div>
     <div className="network-identity-grid">
-      <div><span>Current public IP</span><strong className="mono">{current?.ip??'—'}</strong><small>{current?.observedAt?'Checked '+rel(current.observedAt):'Waiting for lookup'}</small></div>
-      <div><span>Previous public IP</span><strong className="mono">{previous?.ip??'—'}</strong><small>{previous?.observedAt?'Previous check · '+new Date(previous.observedAt).toLocaleString():'Baseline will be saved after first successful lookup'}</small></div>
-      <div><span>ASN / organization</span><strong>{current?.asn?'AS'+current.asn:'—'}</strong><small>{current?.organization??'Unknown organization'}</small></div>
-      <div><span>Approx. region</span><strong>{location}</strong><small>{previous?'Previous: '+previousLocation:'IP geolocation is approximate'}</small></div>
+      <div><span>Current Public IP</span><strong className="mono">{current?.ip??'—'}</strong><small>{current?.observedAt?'Observed '+rel(current.observedAt):'Waiting for backend lookup'}</small></div>
+      <div><span>ASN</span><strong>{current?.asn?`AS${current.asn}`:'—'}</strong><small>{current?.organization??'Unknown organization'}</small></div>
+      <div><span>Country / Region</span><strong>{countryRegion}</strong><small>{current?.city?`Approx. city: ${current.city}`:'IP geolocation is approximate'}</small></div>
+      <div><span>Previous Public IP</span><strong className="mono">{previous?.ip??'—'}</strong><small>{previous?.observedAt?`${new Date(previous.observedAt).toLocaleString()} · ${previousCountryRegion}`:'No persisted baseline yet'}</small></div>
+      <div><span>IP changed</span><strong>{ipChanged===undefined?'—':ipChanged?'Yes':'No'}</strong><small>{previous?'Compared with previous successful check':'Needs a previous successful check'}</small></div>
+      <div><span>Last checked</span><strong>{identity.checkedAt?new Date(identity.checkedAt).toLocaleString():'—'}</strong><small>{identity.checkedAt?rel(identity.checkedAt):'No backend result yet'}</small></div>
+      <div><span>Recent changes</span><strong>{identity.recentChanges?`${identity.recentChanges.ip} IP / ${identity.recentChanges.asn} ASN`:'—'}</strong><small>{identity.recentChanges?`Last ${shortWindowHours}h · region ${identity.recentChanges.region} · country ${identity.recentChanges.country}`:`Last ${shortWindowHours}h history unavailable`}</small></div>
+      <div><span>Risk</span><strong>{level}</strong><small>{score===undefined?'Score unavailable':`BBot score ${score}/100`}</small></div>
     </div>
     <div className="network-comparison">
       <div className="network-comparison-head">
@@ -246,9 +255,10 @@ function NetworkIdentityPanel({identity}:{identity:NonNullable<Snapshot['network
     </div>
     <div className="network-risk-detail">
       <div><strong>Risk factors</strong><span>{identity.risk?.reasons?.join(' · ')??'Risk data unavailable'}</span></div>
-      <small>BBot独自のネットワーク差分スコアです。Hypixel公式の判定値・ban確率ではありません。</small>
+      <small>BBot独自のネットワーク差分・短期変動スコアです。Hypixel公式のSecurity Block判定やban確率を再現したものではありません。</small>
     </div>
-    {identity.status==='UNAVAILABLE'&&<div className="network-identity-note"><Radio size={17}/><span>Public IPの確認に失敗しました。前回値は保持されています。</span></div>}
+    {identity.status==='CHECKING'&&<div className="network-identity-note"><Radio size={17}/><span>BackendがPublic IP / ASN / 地域を確認しています。</span></div>}
+    {identity.status==='UNAVAILABLE'&&<div className="network-identity-note"><Radio size={17}/><span>Backendのネットワーク診断を取得できません。Web単独起動または外部IP情報の取得失敗時はRiskをUnknownとして表示します。</span></div>}
   </section>
 }
 function Dashboard({data,active,live,pending,go,perform}:{data:Snapshot;active:number;live:number;pending:number;go:(p:Page)=>void;perform:(task:()=>void,success?:string)=>void}){
@@ -261,9 +271,14 @@ function Dashboard({data,active,live,pending,go,perform}:{data:Snapshot;active:n
   const forgeRss=resourceWorkers.length?resourceWorkers.reduce((sum,worker)=>sum+(worker.rssMb??0),0):undefined;
   const forgeProcesses=resourceWorkers.reduce((sum,worker)=>sum+(worker.processCount??0),0);
   const forgeMode=data.transport==='forge';
+  const networkIdentity:NonNullable<Snapshot['networkIdentity']>=data.networkIdentity??{
+    status:'UNAVAILABLE',
+    changed:false,
+    risk:{level:'Unknown',reasons:[client.mode==='remote'?'Backend network diagnostic has not returned data':'Web-only / mock mode has no backend network diagnostic']}
+  };
   return <div className="dashboard"><div className="hero-status"><div className="hero-icon"><Activity size={22}/></div><div><div className="eyebrow">FLEET STATUS</div><strong>{active} of {data.bots.length} bots online</strong><p>Java 1.8.9 <span className="bullet">·</span> {client.mode==='remote'?'Live backend':'Mock data'}</p></div><span className="hero-wave" aria-hidden="true"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></span></div>
     <div className="metrics"><div className="metric"><div className="metric-label"><BotIcon size={17}/> BOTS</div><strong>{active}<span> / {data.settings.maxBots}</span></strong><small>{live} in Pit</small></div><div className="metric"><div className="metric-label"><Layers3 size={17}/> INSTANCES</div><strong>{data.instances.length}</strong><small>{suspect?`${suspect} need attention`:'All observed'}</small></div><div className="metric"><div className="metric-label"><ListChecks size={17}/> OPEN JOBS</div><strong>{pending}</strong><small>{data.jobs.filter(j=>j.state==='RUNNING').length} running</small></div></div>
-    {data.networkIdentity&&<NetworkIdentityPanel identity={data.networkIdentity}/>}
+    <NetworkIdentityPanel identity={networkIdentity}/>
     {data.carePackages&&<CarePackagePanel schedule={data.carePackages} tracking={data.carePackageTracking}/>}
     {perf&&<section className="panel performance-panel"><SectionHead kicker="DIAGNOSTICS" title="Performance"/><div className="performance-metrics">
       <div><span>{forgeMode?'Forge CPU':'Backend CPU'}</span><strong>{forgeMode?(forgeCpu===undefined?'—':`${forgeCpu.toFixed(1)}%`):`${perf.runtime.cpuPercent.toFixed(1)}%`}</strong>{forgeMode&&<small>{resourceWorkers.length} worker · {forgeProcesses} processes</small>}</div>
