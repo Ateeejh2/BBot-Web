@@ -203,12 +203,31 @@ function NetworkIdentityPanel({identity}:{identity:NonNullable<Snapshot['network
   const current=identity.current,previous=identity.previous;
   const location=current?[current.city,current.region,current.countryCode].filter(Boolean).join(' · '):'—';
   const previousLocation=previous?[previous.city,previous.region,previous.countryCode].filter(Boolean).join(' · '):'—';
-  const status=identity.status==='CHECKING'?'CHECKING':identity.status==='UNAVAILABLE'?'UNAVAILABLE':identity.changed?'CAUTION':'UNCHANGED';
-  return <section className={'panel network-identity-panel '+(identity.changed?'caution':'')}>
-    <div className="network-identity-head"><div><span className="eyebrow">EGRESS NETWORK</span><h2>Public network identity</h2></div>
-      <span className={'network-identity-state '+(identity.changed?'caution':identity.status==='OK'?'stable':'quiet')}>
-        {identity.changed?<AlertTriangle size={15}/>:identity.status==='OK'?<Check size={15}/>:<Radio size={15}/>} {status}
-      </span>
+  const level=identity.risk?.level??'Unknown',score=identity.risk?.score;
+  const riskClass=level.toLowerCase();
+  const comparison=identity.status==='UNAVAILABLE'
+    ?'Current lookup unavailable'
+    :!previous
+      ?'No previous baseline'
+      :identity.changed
+        ?'Changed since previous backend run'
+        :'Matches previous backend run';
+  const changes=[
+    ['IP',identity.changes?.ip],
+    ['ASN',identity.changes?.asn],
+    ['Country',identity.changes?.country],
+    ['Region',identity.changes?.region],
+    ['City',identity.changes?.city]
+  ] as const;
+  return <section className={`panel network-identity-panel risk-${riskClass}`}>
+    <div className="network-identity-head">
+      <div><span className="eyebrow">EGRESS NETWORK</span><h2>Public network identity</h2></div>
+      <div className="network-risk">
+        <span className={`network-risk-level ${riskClass}`}>
+          {level==='Safe'?<ShieldCheck size={15}/>:level==='Unknown'?<CircleHelp size={15}/>:<AlertTriangle size={15}/>} {level}
+        </span>
+        <strong>{score===undefined?'—':score}<small>/100</small></strong>
+      </div>
     </div>
     <div className="network-identity-grid">
       <div><span>Current public IP</span><strong className="mono">{current?.ip??'—'}</strong><small>{current?.observedAt?'Checked '+rel(current.observedAt):'Waiting for lookup'}</small></div>
@@ -216,7 +235,19 @@ function NetworkIdentityPanel({identity}:{identity:NonNullable<Snapshot['network
       <div><span>ASN / organization</span><strong>{current?.asn?'AS'+current.asn:'—'}</strong><small>{current?.organization??'Unknown organization'}</small></div>
       <div><span>Approx. region</span><strong>{location}</strong><small>{previous?'Previous: '+previousLocation:'IP geolocation is approximate'}</small></div>
     </div>
-    {identity.changed&&<div className="network-identity-warning" role="alert"><AlertTriangle size={18}/><div><strong>CAUTION — public network identity changed</strong><span>前回のBackend起動時と外向きネットワークが異なります。Botを接続する前に意図した環境か確認してください。</span></div></div>}
+    <div className="network-comparison">
+      <div className="network-comparison-head">
+        <strong>{comparison}</strong>
+        {identity.checkedAt&&<small>Last checked {rel(identity.checkedAt)}</small>}
+      </div>
+      {identity.changes
+        ?<div className="network-change-tags">{changes.map(([label,changed])=><span key={label} className={changed?'changed':'same'}>{changed?<AlertTriangle size={12}/>:<Check size={12}/>} {label} {changed?'changed':'same'}</span>)}</div>
+        :<span className="network-no-baseline">比較可能な前回データがありません。</span>}
+    </div>
+    <div className="network-risk-detail">
+      <div><strong>Risk factors</strong><span>{identity.risk?.reasons?.join(' · ')??'Risk data unavailable'}</span></div>
+      <small>BBot独自のネットワーク差分スコアです。Hypixel公式の判定値・ban確率ではありません。</small>
+    </div>
     {identity.status==='UNAVAILABLE'&&<div className="network-identity-note"><Radio size={17}/><span>Public IPの確認に失敗しました。前回値は保持されています。</span></div>}
   </section>
 }
