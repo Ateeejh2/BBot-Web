@@ -171,12 +171,14 @@ try {
   assert.ok(appSource.includes('Movement Debug Mode')&&appSource.includes('Connect → Pathfind only')&&appSource.includes('client.setMovementDebug!'));
   assert.ok(appSource.includes('client.launchForge!')&&appSource.includes('client.quitForge!'));
   assert.ok(appSource.includes('Launch')&&appSource.includes('Disconnect')&&appSource.includes('Forge Worker'));
+  assert.ok(appSource.includes('BAN detected')&&appSource.includes('KICK detected')&&appSource.includes('Saved on this account')&&appSource.includes("moderation.kind==='BAN'"));
   const { RemoteBBotClient } = await server.ssrLoadModule('/src/client/remote.ts');
   const oldWindow=globalThis.window,oldSocket=globalThis.WebSocket,oldFetch=globalThis.fetch;
   const oldLocalStorage=globalThis.localStorage,oldSessionStorage=globalThis.sessionStorage;
   let browserWrites=0;
   const sessionAccountId='33333333-3333-4333-8333-333333333333';
-  const requests=[];let wire={version:1,bots:[{id:'bot-1',accountId:'account-1',accountLabel:'Scout',state:'DISCONNECTED'}],
+  const requests=[];let wire={version:1,bots:[{id:'bot-1',accountId:'account-1',accountLabel:'Scout',state:'DISCONNECTED',
+    moderation:{kind:'BAN',reason:'You are permanently banned from this server! Reason: smoke test',detectedAt:123,persistent:true}}],
     instances:[{id:'mega-a',status:'ACTIVE',firstSeen:0,lastSeen:0}],jobs:[],networkIdentity:{status:'OK',changed:true,checkedAt:Date.now(),current:{ip:'203.0.113.20',asn:64501,organization:'Example Cloud',countryCode:'JP',region:'Tokyo',city:'Tokyo',observedAt:Date.now()},previous:{ip:'203.0.113.10',asn:64500,organization:'Previous Cloud',countryCode:'JP',region:'Osaka',city:'Osaka',observedAt:Date.now()-60000},changes:{ip:true,asn:true,country:false,region:true,city:true},risk:{score:75,level:'Dangerous',reasons:['Public IP changed (+25)','ASN changed (+30)','Region changed (+15)','City changed (+5)']}},carePackages:{source:'brookeafk.com',sourceUrl:'https://brookeafk.com/',updatedAt:Date.now(),status:'OK',events:[1,2,3,4,5].map(n=>({timestamp:Date.now()+n*60000}))},carePackageTracking:{timestamp:Date.now()+60000,instances:[{instanceId:'mega-a',state:'LAUNCHING',target:{x:80,y:110,z:-30}}]},performance:{runtime:{cpuPercent:12.5,rssMb:128,heapUsedMb:64,heapTotalMb:96,eventLoopMeanMs:2,eventLoopP99Ms:4,eventLoopMaxMs:7,uptimeSeconds:10},pathfinding:{active:0,queued:0,concurrency:2,bots:[{botId:'bot-1',pingMs:87,pathAttempts:1,pathCompleted:1,pathFailed:0,lastPathMs:250,lastPathQueueMs:3}]}},logs:[],viewer:null,accounts:remoteSnapshot.accounts,serverConnection:remoteSnapshot.serverConnection};
   try{
     let failNextStart=false;
@@ -218,6 +220,9 @@ try {
     assert.equal(remote.getSnapshot().networkIdentity?.current?.ip,'203.0.113.20');
     assert.equal(remote.getSnapshot().networkIdentity?.previous?.ip,'203.0.113.10');
     assert.equal(remote.getSnapshot().networkIdentity?.changed,true);
+    assert.equal(remote.getSnapshot().bots[0]?.moderation?.kind,'BAN');
+    assert.equal(remote.getSnapshot().bots[0]?.moderation?.persistent,true);
+    assert.equal(remote.getSnapshot().bots[0]?.moderation?.reason,'You are permanently banned from this server! Reason: smoke test');
     assert.equal(remote.getSnapshot().performance?.pathfinding.bots[0]?.pingMs,87);
     assert.equal(remote.getSnapshot().performance?.pathfinding.bots[0]?.lastPathMs,250);
     assert.equal(remote.getSnapshot().carePackages?.source,'brookeafk.com');
