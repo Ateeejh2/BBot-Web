@@ -14,16 +14,19 @@ export interface JobCreateInput { instanceId:string; eventType:string; target:{x
 export interface RuntimePerformance { cpuPercent:number; rssMb:number; heapUsedMb:number; heapTotalMb:number; eventLoopMeanMs:number; eventLoopP99Ms:number; eventLoopMaxMs:number; uptimeSeconds:number }
 export interface BotPathPerformance { botId:string; pingMs?:number; pathAttempts:number; pathCompleted:number; pathFailed:number; activePathMs?:number; lastPathMs?:number; lastPathQueueMs?:number }
 export interface PerformanceSnapshot { runtime:RuntimePerformance; pathfinding:{active:number;queued:number;concurrency:number;bots:BotPathPerformance[]} }
-export interface NetworkIdentityPoint { ip:string; countryCode?:string; region?:string; city?:string; asn?:number; organization?:string; observedAt:number }
+export interface NetworkIdentityPoint { ip:string; country?:string; countryCode?:string; region?:string; city?:string; asn?:number; organization?:string; observedAt:number }
 export type NetworkIdentityRiskLevel = 'Safe'|'Caution'|'Warning'|'Dangerous'|'Unknown';
 export interface NetworkIdentityChanges { ip:boolean; asn:boolean; country:boolean; region:boolean; city:boolean }
 export interface NetworkIdentityRisk { score?:number; level:NetworkIdentityRiskLevel; reasons:string[] }
+export interface NetworkIdentityRecentChanges { windowMs:number; since:number; ip:number; asn:number; country:number; region:number }
 export interface NetworkIdentitySnapshot {
   status:'CHECKING'|'OK'|'UNAVAILABLE';
   current?:NetworkIdentityPoint;
   previous?:NetworkIdentityPoint;
   changed:boolean;
+  ipChanged?:boolean;
   changes?:NetworkIdentityChanges;
+  recentChanges?:NetworkIdentityRecentChanges;
   risk:NetworkIdentityRisk;
   checkedAt?:number;
 }
