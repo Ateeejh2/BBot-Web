@@ -210,8 +210,8 @@ function NetworkIdentityPanel({identity}:{identity:NonNullable<Snapshot['network
     :!previous
       ?'No previous baseline'
       :identity.changed
-        ?'Changed since previous backend run'
-        :'Matches previous backend run';
+        ?'Changed since previous check'
+        :'Matches previous check';
   const changes=[
     ['IP',identity.changes?.ip],
     ['ASN',identity.changes?.asn],
@@ -231,7 +231,7 @@ function NetworkIdentityPanel({identity}:{identity:NonNullable<Snapshot['network
     </div>
     <div className="network-identity-grid">
       <div><span>Current public IP</span><strong className="mono">{current?.ip??'—'}</strong><small>{current?.observedAt?'Checked '+rel(current.observedAt):'Waiting for lookup'}</small></div>
-      <div><span>Previous public IP</span><strong className="mono">{previous?.ip??'—'}</strong><small>{previous?.observedAt?'Previous run · '+new Date(previous.observedAt).toLocaleString():'Baseline will be saved after first successful lookup'}</small></div>
+      <div><span>Previous public IP</span><strong className="mono">{previous?.ip??'—'}</strong><small>{previous?.observedAt?'Previous check · '+new Date(previous.observedAt).toLocaleString():'Baseline will be saved after first successful lookup'}</small></div>
       <div><span>ASN / organization</span><strong>{current?.asn?'AS'+current.asn:'—'}</strong><small>{current?.organization??'Unknown organization'}</small></div>
       <div><span>Approx. region</span><strong>{location}</strong><small>{previous?'Previous: '+previousLocation:'IP geolocation is approximate'}</small></div>
     </div>
