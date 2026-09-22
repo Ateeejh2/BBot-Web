@@ -199,6 +199,27 @@ function CarePackagePanel({schedule,tracking}:{schedule:NonNullable<Snapshot['ca
     </div>}
   </section>
 }
+function NetworkIdentityPanel({identity}:{identity:NonNullable<Snapshot['networkIdentity']>}){
+  const current=identity.current,previous=identity.previous;
+  const location=current?[current.city,current.region,current.countryCode].filter(Boolean).join(' · '):'—';
+  const previousLocation=previous?[previous.city,previous.region,previous.countryCode].filter(Boolean).join(' · '):'—';
+  const status=identity.status==='CHECKING'?'CHECKING':identity.status==='UNAVAILABLE'?'UNAVAILABLE':identity.changed?'CAUTION':'UNCHANGED';
+  return <section className={'panel network-identity-panel '+(identity.changed?'caution':'')}>
+    <div className="network-identity-head"><div><span className="eyebrow">EGRESS NETWORK</span><h2>Public network identity</h2></div>
+      <span className={'network-identity-state '+(identity.changed?'caution':identity.status==='OK'?'stable':'quiet')}>
+        {identity.changed?<AlertTriangle size={15}/>:identity.status==='OK'?<Check size={15}/>:<Radio size={15}/>} {status}
+      </span>
+    </div>
+    <div className="network-identity-grid">
+      <div><span>Current public IP</span><strong className="mono">{current?.ip??'—'}</strong><small>{current?.observedAt?'Checked '+rel(current.observedAt):'Waiting for lookup'}</small></div>
+      <div><span>Previous public IP</span><strong className="mono">{previous?.ip??'—'}</strong><small>{previous?.observedAt?'Previous run · '+new Date(previous.observedAt).toLocaleString():'Baseline will be saved after first successful lookup'}</small></div>
+      <div><span>ASN / organization</span><strong>{current?.asn?'AS'+current.asn:'—'}</strong><small>{current?.organization??'Unknown organization'}</small></div>
+      <div><span>Approx. region</span><strong>{location}</strong><small>{previous?'Previous: '+previousLocation:'IP geolocation is approximate'}</small></div>
+    </div>
+    {identity.changed&&<div className="network-identity-warning" role="alert"><AlertTriangle size={18}/><div><strong>CAUTION — public network identity changed</strong><span>前回のBackend起動時と外向きネットワークが異なります。Botを接続する前に意図した環境か確認してください。</span></div></div>}
+    {identity.status==='UNAVAILABLE'&&<div className="network-identity-note"><Radio size={17}/><span>Public IPの確認に失敗しました。前回値は保持されています。</span></div>}
+  </section>
+}
 function Dashboard({data,active,live,pending,go,perform}:{data:Snapshot;active:number;live:number;pending:number;go:(p:Page)=>void;perform:(task:()=>void,success?:string)=>void}){
   const suspect=data.instances.filter(i=>i.status==='SUSPECT').length;
   const perf=data.performance,pathBots=perf?.pathfinding.bots.filter(p=>p.pathAttempts>0)||[];
@@ -211,7 +232,7 @@ function Dashboard({data,active,live,pending,go,perform}:{data:Snapshot;active:n
   const forgeMode=data.transport==='forge';
   return <div className="dashboard"><div className="hero-status"><div className="hero-icon"><Activity size={22}/></div><div><div className="eyebrow">FLEET STATUS</div><strong>{active} of {data.bots.length} bots online</strong><p>Java 1.8.9 <span className="bullet">·</span> {client.mode==='remote'?'Live backend':'Mock data'}</p></div><span className="hero-wave" aria-hidden="true"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></span></div>
     <div className="metrics"><div className="metric"><div className="metric-label"><BotIcon size={17}/> BOTS</div><strong>{active}<span> / {data.settings.maxBots}</span></strong><small>{live} in Pit</small></div><div className="metric"><div className="metric-label"><Layers3 size={17}/> INSTANCES</div><strong>{data.instances.length}</strong><small>{suspect?`${suspect} need attention`:'All observed'}</small></div><div className="metric"><div className="metric-label"><ListChecks size={17}/> OPEN JOBS</div><strong>{pending}</strong><small>{data.jobs.filter(j=>j.state==='RUNNING').length} running</small></div></div>
-    {data.carePackages&&<CarePackagePanel schedule={data.carePackages} tracking={data.carePackageTracking}/>}
+    {data.networkIdentity&&<NetworkIdentityPanel identity={data.networkIdentity}/>}\n    {data.carePackages&&<CarePackagePanel schedule={data.carePackages} tracking={data.carePackageTracking}/>}
     {perf&&<section className="panel performance-panel"><SectionHead kicker="DIAGNOSTICS" title="Performance"/><div className="performance-metrics">
       <div><span>{forgeMode?'Forge CPU':'Backend CPU'}</span><strong>{forgeMode?(forgeCpu===undefined?'—':`${forgeCpu.toFixed(1)}%`):`${perf.runtime.cpuPercent.toFixed(1)}%`}</strong>{forgeMode&&<small>{resourceWorkers.length} worker · {forgeProcesses} processes</small>}</div>
       <div><span>{forgeMode?'Forge RSS memory':'Backend RSS memory'}</span><strong>{forgeMode?(forgeRss===undefined?'—':`${forgeRss.toFixed(1)} MB`):`${perf.runtime.rssMb.toFixed(1)} MB`}</strong>{forgeMode&&<small>HeadlessMC + Minecraft</small>}</div>
