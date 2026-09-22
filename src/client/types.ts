@@ -4,7 +4,9 @@ export type BotState = typeof botStates[number];
 export type InstanceStatus = 'ACTIVE' | 'SUSPECT' | 'INACTIVE';
 export type JobStatus = 'QUEUED' | 'ASSIGNED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
 export type AccountKind = 'SESSION' | 'MICROSOFT';
-export interface Bot { id:string; accountId:string; name:string; state:BotState; startQueued?:boolean; instanceId?:string; x:number;y:number;z:number; jobId?:string; updatedAt:number; kickReason?:string; kickedAt?:number; activity?:{kind:'SCANNING_CHUNKS';progress:number} }
+export type ModerationKind = 'KICK' | 'BAN';
+export interface ModerationIncident { kind:ModerationKind; reason:string; detectedAt:number; persistent:boolean }
+export interface Bot { id:string; accountId:string; name:string; state:BotState; startQueued?:boolean; instanceId?:string; x:number;y:number;z:number; jobId?:string; updatedAt:number; kickReason?:string; kickedAt?:number; moderation?:ModerationIncident; activity?:{kind:'SCANNING_CHUNKS';progress:number} }
 export type ForgeWorkerPhase = 'STOPPED'|'LAUNCHING'|'LAUNCHED'|'STOPPING';
 export interface ForgeWorker { botId:string; phase:ForgeWorkerPhase; bridgePort:number; lastError?:string; cpuPercent?:number; rssMb?:number; processCount?:number; launchProgress?:number }
 export interface Instance { id:string; status:InstanceStatus; firstSeen:number; lastSeen:number; metadata?:string }
@@ -32,7 +34,7 @@ export interface NetworkIdentitySnapshot {
 }
 export interface CarePackageSchedule { source:'brookeafk.com'; sourceUrl:string; updatedAt?:number; status:'OK'|'STALE'|'UNAVAILABLE'; events:Array<{timestamp:number}> }
 export interface CarePackageTracking { timestamp?:number; instances:Array<{instanceId:string;state:'ARMED'|'STARTED'|'CARRIER_DETECTED'|'LAUNCHING'|'DROPPED'|'CHEST_DETECTED'|'LAUNCH_FAILED';startedAt?:number;area?:string;target?:{x:number;y:number;z:number}}> }
-export interface Account { id:string; label:string; kind:AccountKind; status:'READY'|'UNASSIGNED'|'WAITING_FOR_LOGIN'|'ERROR'; minecraftName?:string; assignedBot?:string; createdAt:number; authError?:'SESSION_TOKEN_INVALID' }
+export interface Account { id:string; label:string; kind:AccountKind; status:'READY'|'UNASSIGNED'|'WAITING_FOR_LOGIN'|'ERROR'; minecraftName?:string; assignedBot?:string; createdAt:number; authError?:'SESSION_TOKEN_INVALID'; ban?:{kind:'BAN';reason:string;detectedAt:number} }
 export interface MicrosoftAuthChallenge { verificationUri:string; userCode:string; expiresAt:number }
 export interface SessionAccountInput { accessToken:string }
 export interface FleetActionResult { started?:string[]; stopped?:string[]; skipped?:Array<{botId:string;reason:string}> }
