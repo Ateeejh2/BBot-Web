@@ -15,7 +15,7 @@ export interface RuntimePerformance { cpuPercent:number; rssMb:number; heapUsedM
 export interface BotPathPerformance { botId:string; pingMs?:number; pathAttempts:number; pathCompleted:number; pathFailed:number; activePathMs?:number; lastPathMs?:number; lastPathQueueMs?:number }
 export interface PerformanceSnapshot { runtime:RuntimePerformance; pathfinding:{active:number;queued:number;concurrency:number;bots:BotPathPerformance[]} }
 export interface NetworkIdentityPoint { ip:string; countryCode?:string; region?:string; city?:string; asn?:number; organization?:string; observedAt:number }
-export type NetworkIdentityRiskLevel = 'Safe'|'Cauction'|'Warning'|'Dangerous'|'Unknown';
+export type NetworkIdentityRiskLevel = 'Safe'|'Caution'|'Warning'|'Dangerous'|'Unknown';
 export interface NetworkIdentityChanges { ip:boolean; asn:boolean; country:boolean; region:boolean; city:boolean }
 export interface NetworkIdentityRisk { score?:number; level:NetworkIdentityRiskLevel; reasons:string[] }
 export interface NetworkIdentitySnapshot {
