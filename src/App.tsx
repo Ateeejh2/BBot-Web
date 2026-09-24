@@ -200,7 +200,14 @@ function carePackageProgress(item:NonNullable<Snapshot['carePackageTracking']>['
     case 'CHEST_FOUND': return {label:'Chest Found',phase:'active'};
     case 'PATHFINDING': return {label:'Pathfinding',phase:'active'};
     case 'PATHFIND_DONE': return {label:'Pathfind Done',phase:'active'};
-    case 'CLICKING': return {label:'Clicking',detail:item.clicksRemaining===undefined?'Reading hologram…':`Remain ${item.clicksRemaining} Click${item.clicksRemaining===1?'':'s'}`,phase:'active'};
+    case 'CLICKING': {
+      const detail=[
+        item.clicksRemaining===undefined?'Reading hologram…':`Remain ${item.clicksRemaining} Click${item.clicksRemaining===1?'':'s'}`,
+        item.clicksSent===undefined?undefined:`Clicks Sent: ${item.clicksSent}`,
+        item.losBlocked===undefined?undefined:`Chest LOS: ${item.losBlocked?'Player Blocking':'Clear'}`
+      ].filter((value):value is string=>Boolean(value)).join(' · ');
+      return {label:'Clicking',detail,phase:item.losBlocked?'blocked':'active'};
+    }
     case 'OPENED': return {label:'Opened',detail:item.gotItems?.length?`Priority loot: ${item.gotItems.join(', ')}`:undefined,phase:'opened'};
     case 'GOT': return {label:'Got',detail:item.gotItems?.length?item.gotItems.join(', '):'Care Package completed',phase:'got'};
     case 'FAIL': return {label:'Fail',detail:item.failureReason??'Care Package processing failed',phase:'fail'};
