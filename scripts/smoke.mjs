@@ -1,0 +1,285 @@
+import assert from 'node:assert/strict';
+import { renderToString } from 'react-dom/server';
+import { createElement } from 'react';
+import { createServer } from 'vite';
+const server = await createServer({ server:{ middlewareMode:true },appType:'custom' });
+try {
+  const { MockBBotClient } = await server.ssrLoadModule('/src/client/mock.ts');
+  const { validMinecraftUsername } = await server.ssrLoadModule('/src/client/types.ts');
+  const { sendPartyInvite,sendPartyWarp } = await server.ssrLoadModule('/src/server/party.ts');
+  const { validServerHost,validateServerConnection } = await server.ssrLoadModule('/src/client/serverConnection.ts');
+  const { putServerConnection,postServerReconnect } = await server.ssrLoadModule('/src/server/serverConnection.ts');
+  const { App } = await server.ssrLoadModule('/src/App.tsx');
+  const { ServerConnectionPanel } = await server.ssrLoadModule('/src/ServerConnectionPanel.tsx');
+  const { RemoteAccountsPanel } = await server.ssrLoadModule('/src/RemoteAccountsPanel.tsx');
+  const client = new MockBBotClient();
+  let updates=0;const unsubscribe=client.subscribe(()=>updates++);
+  client.createBots(20);
+  assert.equal(client.getSnapshot().bots.length,20);
+  assert.equal(client.getSnapshot().accounts.length,20);
+  assert.equal(client.getSnapshot().settings.javaVersion,'1.8.9');
+  client.addInstance();
+  const instance=client.getSnapshot().instances.at(-1);
+  assert.equal(instance.status,'ACTIVE');
+  client.setInstanceStatus(instance.id,'SUSPECT');
+  assert.equal(client.getSnapshot().instances.at(-1).status,'SUSPECT');
+  const bot='bot-06';client.startBot(bot);
+  assert.equal(client.getSnapshot().bots.find(b=>b.id===bot).state,'CONNECTING');
+  client.setBotState(bot,'IN_PIT_IDLE');
+  assert.ok(client.getSnapshot().bots.find(b=>b.id===bot).instanceId);
+  client.recoverBot(bot);
+  assert.equal(client.getSnapshot().bots.find(b=>b.id===bot).instanceId,undefined);
+  client.stopBot(bot);
+  assert.equal(client.getSnapshot().bots.find(b=>b.id===bot).state,'DISCONNECTED');
+  client.addAccount('UI Example','SESSION');
+  assert.equal(client.getSnapshot().accounts.at(-1).label,'UI Example');
+  assert.equal(JSON.stringify(client.getSnapshot()).includes('token'),false);
+  client.createJob('mega10c');
+  const job=client.getSnapshot().jobs[0];
+  assert.equal(job.state,'QUEUED');
+  client.setJobState(job.id,'ASSIGNED');
+  assert.equal(client.getSnapshot().jobs[0].state,'ASSIGNED');
+  client.setJobState(job.id,'COMPLETED');
+  assert.equal(client.getSnapshot().jobs[0].state,'COMPLETED');
+  assert.ok(updates>=9);unsubscribe();
+  for(const name of ['A','Player_123','a'.repeat(16)])assert.ok(validMinecraftUsername(name));
+  for(const name of ['', 'a'.repeat(17),'/trade Player','a-b','é'])assert.equal(validMinecraftUsername(name),false);
+  assert.throws(()=>client.startTrade('bot-01','/trade Player'));
+  client.startTrade('bot-01','Player_123');
+  const waiting=client.getTradeState('bot-01');assert.equal(waiting.status,'WAITING_FOR_GUI');
+  assert.throws(()=>client.startTrade('bot-01','Again'));
+  assert.equal(client.getTradeState('bot-02').status,'IDLE');
+  await new Promise(resolve=>setTimeout(resolve,900));
+  const open=client.getTradeState('bot-01');assert.equal(open.status,'OPEN');
+  const w=open.window;assert.equal(w.slots.length,w.slotCount);
+  const click={tradeSessionId:open.tradeSessionId,windowId:w.windowId,slot:w.slotCount,revision:open.revision};
+  assert.throws(()=>client.clickTradeSlot('bot-01',{...click,slot:999}));
+  assert.throws(()=>client.clickTradeSlot('bot-01',{...click,windowId:-1}));
+  assert.throws(()=>client.clickTradeSlot('bot-01',{...click,tradeSessionId:'stale'}));
+  assert.throws(()=>client.clickTradeSlot('bot-01',{...click,revision:open.revision-1}));
+  client.clickTradeSlot('bot-01',click);
+  assert.equal(client.getTradeState('bot-01').window.slots[0],null);
+  await new Promise(resolve=>setTimeout(resolve,230));
+  assert.equal(client.getTradeState('bot-01').window.slots[0].name,'Diamond Sword');
+  assert.ok(client.getTradeState('bot-01').revision>open.revision);
+  client.cancelTrade('bot-01');assert.equal(client.getTradeState('bot-01').status,'CLOSED');
+  client.startTrade('bot-01','Next');client.simulateTradeTimeout('bot-01');
+  assert.equal(client.getTradeState('bot-01').error,'Trade GUI timeout');
+  await new Promise(resolve=>setTimeout(resolve,900));assert.equal(client.getTradeState('bot-01').status,'TIMEOUT');
+  client.startTrade('bot-01','Last');client.stopBot('bot-01');
+  assert.equal(client.getTradeState('bot-01').status,'CLOSED');
+  client.startTrade('bot-02','Separate');client.setBotState('bot-02','LOBBY');
+  assert.equal(client.getTradeState('bot-02').status,'CLOSED');
+  assert.equal(client.getTradeState('bot-03').status,'IDLE');
+  const partyBot=client.getSnapshot().bots.find(b=>b.id==='bot-04');
+  assert.equal(client.inviteParty(partyBot.id,'Example_Player').message,'Party command sent to Example_Player');
+  assert.equal(client.warpParty(partyBot.id).message,'Party warp command sent');
+  assert.throws(()=>client.inviteParty(partyBot.id,'/p Someone'));
+  assert.throws(()=>client.inviteParty(partyBot.id,'Name; /stop'));
+  assert.throws(()=>client.inviteParty('bot-06','Player'));
+  assert.throws(()=>client.warpParty('bot-06'));
+  assert.equal(client.getSnapshot().logs[0].botId,partyBot.id);
+  const commands=[];
+  const backendBots=new Map([['bot-01',{id:'bot-01',state:'IN_PIT_IDLE',chat:command=>commands.push(['bot-01',command])}],['bot-02',{id:'bot-02',state:'LOBBY',chat:command=>commands.push(['bot-02',command])}],['bot-06',{id:'bot-06',state:'DISCONNECTED',chat:command=>commands.push(['bot-06',command])}]]);
+  const resolve=id=>backendBots.get(id);
+  assert.equal(sendPartyInvite(resolve,'bot-02',{targetUsername:'ExamplePlayer'}).status,'SENT');
+  assert.equal(sendPartyWarp(resolve,'bot-01').status,'SENT');
+  assert.deepEqual(commands,[['bot-02','/p ExamplePlayer'],['bot-01','/p warp']]);
+  for(const host of ['mc.example.com','localhost','play.example.net.','127.0.0.1','0.0.0.0','255.255.255.255','::1','2001:db8::42'])assert.equal(validServerHost(host),true,host);
+  for(const host of ['', 'https://mc.example.com','mc.example.com:25565','[::1]','999.1.2.3','999.1.2.3.','127.0.0.01','2001:::1','a..b','-bad.example','bad_.example','a/b'])assert.equal(validServerHost(host),false,host);
+  for(const port of [1,65535])assert.equal(validateServerConnection({host:'mc.example.com',port,version:'1.8.9'}).port,port);
+  for(const port of [0,65536,1.5,'25565',NaN])assert.throws(()=>validateServerConnection({host:'mc.example.com',port,version:'1.8.9'}));
+  assert.throws(()=>validateServerConnection({host:'mc.example.com',port:25565,version:'1.20.4'}));
+  assert.throws(()=>validateServerConnection({host:'mc.example.com',port:25565,version:'1.8.9',command:'/stop'}));
+  const configClient=new MockBBotClient();
+  assert.equal(configClient.getServerConnection().port,25565);
+  const beforeStates=configClient.getSnapshot().bots.map(b=>b.state);
+  const saved=configClient.saveServerConnection({host:'2001:db8::42',port:65535,version:'1.8.9'});
+  assert.equal(saved.revision,1);assert.equal(configClient.getServerConnection().host,'2001:db8::42');
+  assert.deepEqual(configClient.getSnapshot().bots.map(b=>b.state),beforeStates);
+  assert.throws(()=>configClient.reconnectServer(0));
+  const reconnect=configClient.reconnectServer(saved.revision);
+  assert.deepEqual(reconnect.botIds,['bot-01','bot-02','bot-04','bot-05']);
+  configClient.stopBot('bot-02');
+  await new Promise(resolve=>setTimeout(resolve,600));
+  assert.equal(configClient.getSnapshot().bots.find(b=>b.id==='bot-06').state,'DISCONNECTED');
+  assert.equal(configClient.getSnapshot().bots.find(b=>b.id==='bot-02').state,'DISCONNECTED');
+  assert.equal(configClient.getSnapshot().bots.find(b=>b.id==='bot-01').state,'LOBBY');
+  const staleClient=new MockBBotClient();
+  const oldRevision=staleClient.saveServerConnection({host:'first.example',port:25565,version:'1.8.9'}).revision;
+  staleClient.reconnectServer(oldRevision);
+  await new Promise(resolve=>setTimeout(resolve,25));
+  const newer=staleClient.saveServerConnection({host:'second.example',port:25566,version:'1.8.9'});
+  const statesAtSave=staleClient.getSnapshot().bots.map(b=>b.state);
+  await new Promise(resolve=>setTimeout(resolve,600));
+  assert.deepEqual(staleClient.getSnapshot().bots.map(b=>b.state),statesAtSave);
+  assert.throws(()=>staleClient.reconnectServer(oldRevision));assert.equal(newer.revision,2);
+  let persisted={host:'old.example',port:25565,version:'1.8.9',revision:1};const store={get:async()=>persisted,save:async next=>(persisted={...next,revision:persisted.revision+1})};
+  assert.equal((await putServerConnection(store,{host:'new.example',port:25565,version:'1.8.9'})).revision,2);
+  await assert.rejects(()=>putServerConnection(store,{host:'https://bad.example',port:25565,version:'1.8.9'}));
+  let coordinated=0;const coordinator={reconnectConnectedBots:async current=>{coordinated++;return {botIds:['bot-01'],serverRevision:current.revision}}};
+  await assert.rejects(()=>postServerReconnect(store,coordinator,{serverRevision:1}));
+  assert.deepEqual(await postServerReconnect(store,coordinator,{serverRevision:2}),{botIds:['bot-01'],serverRevision:2});assert.equal(coordinated,1);
+  for(const body of [{targetUsername:'Player',command:'/stop'},{command:'/p Player'},{targetUsername:'A; /stop'},{targetUsername:'/p Player'},{targetUsername:''}])assert.throws(()=>sendPartyInvite(resolve,'bot-01',body));
+  assert.throws(()=>sendPartyWarp(resolve,'bot-01',{command:'/anything'}));
+  assert.throws(()=>sendPartyInvite(resolve,'bot-06',{targetUsername:'Player'}));
+  assert.throws(()=>sendPartyWarp(resolve,'bot-06'));
+  assert.deepEqual(commands,[['bot-02','/p ExamplePlayer'],['bot-01','/p warp']]);
+  const html=renderToString(createElement(App));
+  assert.ok(html.includes('Command center')&&html.includes('Java 1.8.9'));
+  assert.ok(html.includes('Connection network diagnostic')&&html.includes('Current Public IP')&&html.includes('Risk')&&html.includes('Unknown'));
+  const serverHtml=renderToString(createElement(ServerConnectionPanel,{snapshot:configClient.getSnapshot(),notify:()=>{}}));
+  assert.ok(serverHtml.includes('Server Connection')&&serverHtml.includes('Minecraft Version')&&serverHtml.includes('Save &amp; Reconnect'));
+  const remoteSnapshot={...configClient.getSnapshot(),bots:[{id:'bot-1',accountId:'account-1',name:'Scout',state:'DISCONNECTED',x:0,y:0,z:0,updatedAt:0}],
+    accounts:[{id:'account-1',label:'Scout',kind:'MICROSOFT',status:'READY',assignedBot:'bot-1',createdAt:0}],
+    serverConnection:{host:'play.example.com',port:25566,version:'1.8.9',revision:2}};
+  const remoteSettings=renderToString(createElement(ServerConnectionPanel,{snapshot:remoteSnapshot,notify:()=>{},mode:'remote'}));
+  assert.ok(remoteSettings.includes('play.example.com')&&remoteSettings.includes('25566')&&remoteSettings.includes('Save'));
+  assert.equal(remoteSettings.includes('Save &amp; Reconnect'),false);
+  const serverSource=await (await import('node:fs/promises')).readFile('src/ServerConnectionPanel.tsx','utf8');
+  assert.match(serverSource,/remoteActive=.*startQueued/);
+  const remoteAccounts=renderToString(createElement(RemoteAccountsPanel,{snapshot:remoteSnapshot,notify:()=>{}}));
+  assert.ok(remoteAccounts.includes('Add Account')&&remoteAccounts.includes('Microsoft')&&remoteAccounts.includes('Scout')&&remoteAccounts.includes('Account assignment'));
+  assert.equal(remoteAccounts.includes('SECRET_REFRESH_TOKEN'),false);
+  assert.ok(remoteAccounts.includes('Session'));
+  const sessionErrorSnapshot={...remoteSnapshot,accounts:[{id:'33333333-3333-4333-8333-333333333333',label:'Expired',kind:'SESSION',status:'ERROR',
+    minecraftName:'ExpiredMC',assignedBot:'bot-1',createdAt:0,authError:'SESSION_TOKEN_INVALID'}]};
+  const sessionErrorHtml=renderToString(createElement(RemoteAccountsPanel,{snapshot:sessionErrorSnapshot,notify:()=>{}}));
+  assert.ok(sessionErrorHtml.includes('Authentication failed')&&sessionErrorHtml.includes('Replace Token required')&&sessionErrorHtml.includes('Auth error'));
+  const sessionSource=await (await import('node:fs/promises')).readFile('src/RemoteAccountsPanel.tsx','utf8');
+  assert.match(sessionSource,/id="session-access-token"[^>]*type="password"[^>]*autoComplete="off"/);
+  assert.equal(sessionSource.includes('session-client-token'),false);
+  assert.equal(sessionSource.includes('session-profile-name'),false);
+  assert.equal(sessionSource.includes('session-profile-id'),false);
+  assert.match(sessionSource,/accessToken\.current\.value=''/);
+  assert.match(sessionSource,/id="session-replace-token"[^>]*type="password"[^>]*autoComplete="off"/);
+  assert.match(sessionSource,/replaceToken\.current\.value=''/);
+  assert.ok(sessionSource.includes('Replace Token'));
+  assert.ok(sessionSource.includes('const botUnavailable=')&&sessionSource.includes('Boolean(bot.startQueued)')&&sessionSource.includes("worker.phase!=='STOPPED'"));
+  assert.match(sessionSource,/disabled=\{busy\|\|botUnavailable\(account\.assignedBot\)\}/);
+  assert.match(sessionSource,/disabled=\{busy\|\|botUnavailable\(bot\.id\)\}/);
+  const appSource=await (await import('node:fs/promises')).readFile('src/App.tsx','utf8');
+  assert.ok(appSource.includes('Submit Job')&&appSource.includes('client.submitJob!'));
+  assert.ok(appSource.includes('Attempts')&&appSource.includes('Last failure')&&appSource.includes('Retry'));
+  assert.ok(appSource.includes('Forge CPU')&&appSource.includes('Forge RSS memory')&&appSource.includes('Backend event loop p99')&&appSource.includes('MC server ping')&&appSource.includes('Path slots'));
+  assert.ok(appSource.includes('Connection network diagnostic')&&appSource.includes('Current Public IP')&&appSource.includes('ASN')&&appSource.includes('Country / Region')&&appSource.includes('Previous Public IP')&&appSource.includes('IP changed')&&appSource.includes('Last checked')&&appSource.includes('Recent changes')&&appSource.includes('Risk factors'));
+  assert.ok(appSource.includes('Hypixel公式のSecurity Block判定やban確率を再現したものではありません'));
+  assert.ok(appSource.includes("status:'UNAVAILABLE'")&&appSource.includes("level:'Unknown'"));
+  assert.ok(appSource.includes('Next Care Packages')&&appSource.includes('brookeafk.com')&&appSource.includes('care-package-countdown'));
+  assert.ok(appSource.includes('Chest Found')&&appSource.includes('Pathfind Done')&&appSource.includes('Remain ')&&appSource.includes('Clicks Sent:')&&appSource.includes('Chest LOS:')&&appSource.includes('Player Blocking')&&appSource.includes('Opened')&&appSource.includes('Priority loot:')&&appSource.includes('Care Package completed'));
+  assert.ok(appSource.includes('PREPARING_EVENT')&&appSource.includes('LIVE TRACKING')&&appSource.includes('CARRIER_DETECTED'));
+  assert.ok(appSource.includes('Test Launch Pad')&&appSource.includes('client.testLaunchPad!'));
+  assert.ok(appSource.includes('Movement Debug Mode')&&appSource.includes('Connect → Pathfind only')&&appSource.includes('client.setMovementDebug!'));
+  assert.ok(appSource.includes('client.launchForge!')&&appSource.includes('client.quitForge!'));
+  assert.ok(appSource.includes('Launch')&&appSource.includes('Disconnect')&&appSource.includes('Forge Worker'));
+  assert.ok(appSource.includes('Live View')&&appSource.includes('viewerEnabled={client.mode===\'mock\'||data.viewer?.botId===b.id}'));
+  assert.ok(appSource.includes('BAN detected')&&appSource.includes('KICK detected')&&appSource.includes('Saved on this account')&&appSource.includes("moderation.kind==='BAN'"));
+  const { RemoteBBotClient } = await server.ssrLoadModule('/src/client/remote.ts');
+  const oldWindow=globalThis.window,oldSocket=globalThis.WebSocket,oldFetch=globalThis.fetch;
+  const oldLocalStorage=globalThis.localStorage,oldSessionStorage=globalThis.sessionStorage;
+  let browserWrites=0;
+  const sessionAccountId='33333333-3333-4333-8333-333333333333';
+  const requests=[];let wire={version:1,bots:[{id:'bot-1',accountId:'account-1',accountLabel:'Scout',state:'DISCONNECTED',
+    moderation:{kind:'BAN',reason:'You are permanently banned from this server! Reason: smoke test',detectedAt:123,persistent:true}}],
+    instances:[{id:'mega-a',status:'ACTIVE',firstSeen:0,lastSeen:0}],jobs:[],networkIdentity:{status:'OK',changed:true,checkedAt:Date.now(),current:{ip:'203.0.113.20',asn:64501,organization:'Example Cloud',countryCode:'JP',region:'Tokyo',city:'Tokyo',observedAt:Date.now()},previous:{ip:'203.0.113.10',asn:64500,organization:'Previous Cloud',countryCode:'JP',region:'Osaka',city:'Osaka',observedAt:Date.now()-60000},changes:{ip:true,asn:true,country:false,region:true,city:true},risk:{score:75,level:'Dangerous',reasons:['Public IP changed (+25)','ASN changed (+30)','Region changed (+15)','City changed (+5)']}},carePackages:{source:'brookeafk.com',sourceUrl:'https://brookeafk.com/',updatedAt:Date.now(),status:'OK',events:[1,2,3,4,5].map(n=>({timestamp:Date.now()+n*60000}))},carePackageTracking:{timestamp:Date.now()+60000,instances:[{instanceId:'mega-a',state:'LAUNCHING',target:{x:80,y:110,z:-30}}]},performance:{runtime:{cpuPercent:12.5,rssMb:128,heapUsedMb:64,heapTotalMb:96,eventLoopMeanMs:2,eventLoopP99Ms:4,eventLoopMaxMs:7,uptimeSeconds:10},pathfinding:{active:0,queued:0,concurrency:2,bots:[{botId:'bot-1',pingMs:87,pathAttempts:1,pathCompleted:1,pathFailed:0,lastPathMs:250,lastPathQueueMs:3}]}},logs:[],viewer:null,accounts:remoteSnapshot.accounts,serverConnection:remoteSnapshot.serverConnection};
+  try{
+    let failNextStart=false;
+    globalThis.window={location:{href:'http://localhost:5173/'},setInterval:()=>0};
+    globalThis.localStorage={setItem:()=>browserWrites++};globalThis.sessionStorage={setItem:()=>browserWrites++};
+    globalThis.WebSocket=class{static OPEN=1;constructor(){this.readyState=0}};
+    globalThis.fetch=async(path,options={})=>{
+      requests.push({path,options});
+      if(path==='/api/v1/settings/server'){const result={...JSON.parse(options.body),revision:3};wire={...wire,serverConnection:result};return Response.json(result)}
+      if(path==='/api/v1/fleet/actions/start-assigned'&&options.method==='POST')return Response.json({started:['bot-1'],skipped:[]})
+      if(path==='/api/v1/fleet/actions/stop-all'&&options.method==='POST')return Response.json({stopped:['bot-1']})
+      if(path==='/api/v1/settings/movement-debug'&&options.method==='PUT'){const body=JSON.parse(options.body);wire={...wire,movementDebug:Boolean(body.enabled)};return Response.json({enabled:wire.movementDebug})}
+      if(path==='/api/v1/bots/bot-1/actions/test-launch-pad'&&options.method==='POST'){wire={...wire,bots:wire.bots.map(b=>b.id==='bot-1'?{...b,state:'PREPARING_EVENT'}:b)};return Response.json(wire)}
+      if(path==='/api/v1/jobs'&&options.method==='POST'){const submitted=JSON.parse(options.body);const job={id:'manual-test',eventType:submitted.eventType,instanceId:submitted.instanceId,state:'QUEUED',x:submitted.target.x,y:submitted.target.y,z:submitted.target.z,expiresAt:submitted.expiresAt,attempts:1,maxAttempts:3,lastFailure:'PATH_NOT_FOUND',lastFailureAt:Date.now(),retryAt:Date.now()+5000};wire={...wire,jobs:[job]};return Response.json(job,{status:201})}
+      if(path==='/api/v1/bots/bot-1/actions/connect'&&options.method==='POST'&&failNextStart){
+        failNextStart=false;
+        wire={...wire,accounts:wire.accounts.map(a=>a.id===sessionAccountId?{...a,status:'ERROR',authError:'SESSION_TOKEN_INVALID'}:a)};
+        return Response.json({error:'SESSION_AUTH_REQUIRED'},{status:422});
+      }
+      if(path==='/api/v1/accounts'&&options.method==='POST'){
+        const submitted=JSON.parse(options.body);
+        const account={id:submitted.kind==='SESSION'?sessionAccountId:'account-2',label:submitted.label,kind:submitted.kind,
+          status:submitted.kind==='SESSION'?'READY':'WAITING_FOR_LOGIN',createdAt:1};
+        wire={...wire,accounts:[...wire.accounts,account]};return Response.json(account,{status:201});
+      }
+      if(path===`/api/v1/accounts/${sessionAccountId}/session-token`&&options.method==='PUT'){
+        const body=JSON.parse(options.body);
+        const account=wire.accounts.find(a=>a.id===sessionAccountId);
+        const updated={...account,minecraftName:'SessionRenamed'};
+        wire={...wire,accounts:wire.accounts.map(a=>a.id===sessionAccountId?updated:a)};
+        return Response.json(updated);
+      }
+      if(path==='/api/v1/bots/bot-1/account'){wire={...wire,accounts:wire.accounts.map(a=>({...a,assignedBot:a.id==='account-2'?'bot-1':undefined}))};return Response.json(wire.accounts[1])}
+      return Response.json(wire);
+    };
+    const remote=new RemoteBBotClient();await new Promise(resolve=>setTimeout(resolve,0));
+    assert.equal(remote.getServerConnection().host,'play.example.com');
+    assert.equal(remote.getSnapshot().performance?.runtime.cpuPercent,12.5);
+    assert.equal(remote.getSnapshot().networkIdentity?.current?.ip,'203.0.113.20');
+    assert.equal(remote.getSnapshot().networkIdentity?.previous?.ip,'203.0.113.10');
+    assert.equal(remote.getSnapshot().networkIdentity?.changed,true);
+    assert.equal(remote.getSnapshot().bots[0]?.moderation?.kind,'BAN');
+    assert.equal(remote.getSnapshot().bots[0]?.moderation?.persistent,true);
+    assert.equal(remote.getSnapshot().bots[0]?.moderation?.reason,'You are permanently banned from this server! Reason: smoke test');
+    assert.equal(remote.getSnapshot().performance?.pathfinding.bots[0]?.pingMs,87);
+    assert.equal(remote.getSnapshot().performance?.pathfinding.bots[0]?.lastPathMs,250);
+    assert.equal(remote.getSnapshot().carePackages?.source,'brookeafk.com');
+    assert.equal(remote.getSnapshot().carePackages?.events.length,5);
+    assert.equal(remote.getSnapshot().carePackageTracking?.instances[0]?.state,'LAUNCHING');
+    assert.equal((await remote.saveServerConnection({host:'next.example',port:25565,version:'1.8.9'})).revision,3);
+    assert.deepEqual((await remote.startAssignedBots()).started,['bot-1']);
+    assert.deepEqual((await remote.stopAllBots()).stopped,['bot-1']);
+    await remote.setMovementDebug(true);assert.equal(remote.getSnapshot().movementDebug,true);await remote.setMovementDebug(false);assert.equal(remote.getSnapshot().movementDebug,false);
+    await remote.testLaunchPad('bot-1');assert.equal(remote.getSnapshot().bots[0]?.state,'PREPARING_EVENT');
+    const manualJob=await remote.submitJob({instanceId:'mega-a',eventType:'manual.test',target:{x:1,y:64,z:-2},expiresAt:Date.now()+60000});
+    assert.equal(manualJob.id,'manual-test');assert.equal(manualJob.maxAttempts,3);assert.equal(manualJob.lastFailure,'PATH_NOT_FOUND');
+    assert.equal(remote.getSnapshot().jobs[0]?.instanceId,'mega-a');assert.equal(remote.getSnapshot().jobs[0]?.retryAt!==undefined,true);
+    await remote.addMicrosoftAccount('Second');await remote.assignAccount('bot-1','account-2');
+    const submitted=await remote.addSessionAccount({label:'Session',accessToken:'TEST_ACCESS'});
+    assert.equal(submitted.kind,'SESSION');
+    const replaced=await remote.replaceSessionToken(submitted.id,'TEST_ACCESS_REPLACED');
+    assert.equal(replaced.minecraftName,'SessionRenamed');
+    wire={...wire,bots:wire.bots.map(b=>b.id==='bot-1'?{...b,accountId:sessionAccountId,accountLabel:'SessionRenamed'}:b),
+      accounts:wire.accounts.map(a=>({...a,assignedBot:a.id===sessionAccountId?'bot-1':undefined}))};
+    await remote['refresh']();
+    failNextStart=true;
+    await assert.rejects(()=>remote.startBot('bot-1'),/Session Tokenが無効または期限切れ/);
+    assert.equal(remote.getSnapshot().accounts.find(a=>a.id===sessionAccountId)?.status,'ERROR');
+    assert.equal(JSON.stringify(remote.getSnapshot()).includes('TEST_ACCESS'),false);
+    assert.equal(JSON.stringify(remote.getSnapshot()).includes('TEST_ACCESS_REPLACED'),false);
+    assert.equal(remote.getSnapshot().accounts.find(a=>a.id===sessionAccountId)?.assignedBot,'bot-1');
+
+    wire={...wire,transport:'forge',forgeWorkers:[{botId:'bot-1',phase:'LAUNCHED',bridgePort:3010}],
+      bots:wire.bots.map(b=>b.id==='bot-1'?{...b,state:'DISCONNECTED'}:b)};
+    await remote['refresh']();
+    await remote.launchForge('bot-1');
+    await remote.startBot('bot-1');
+    await remote.stopBot('bot-1');
+    await remote.quitForge('bot-1');
+    assert.equal(requests.some(r=>r.path==='/api/v1/bots/bot-1/actions/launch'&&r.options.method==='POST'),true);
+    assert.equal(requests.some(r=>r.path==='/api/v1/bots/bot-1/actions/start'&&r.options.method==='POST'),true);
+    assert.equal(requests.some(r=>r.path==='/api/v1/bots/bot-1/actions/disconnect'&&r.options.method==='POST'),true);
+    assert.equal(requests.some(r=>r.path==='/api/v1/bots/bot-1/actions/quit'&&r.options.method==='POST'),true);
+
+    assert.equal(requests.some(r=>r.path==='/api/v1/settings/server'&&r.options.method==='PUT'),true);
+    assert.equal(requests.some(r=>r.path==='/api/v1/accounts'&&r.options.method==='POST'),true);
+    assert.equal(requests.some(r=>r.path==='/api/v1/fleet/actions/start-assigned'&&r.options.method==='POST'),true);
+    assert.equal(requests.some(r=>r.path==='/api/v1/fleet/actions/stop-all'&&r.options.method==='POST'),true);
+    assert.equal(requests.some(r=>r.path==='/api/v1/settings/movement-debug'&&r.options.method==='PUT'),true);
+    assert.equal(requests.some(r=>r.path==='/api/v1/bots/bot-1/actions/test-launch-pad'&&r.options.method==='POST'),true);
+    assert.equal(requests.some(r=>r.path==='/api/v1/jobs'&&r.options.method==='POST'),true);
+    assert.equal(JSON.stringify(requests).includes('SECRET_REFRESH_TOKEN'),false);
+    assert.equal(requests.filter(r=>r.options?.body&&/accessToken/.test(r.options.body)).length,2);
+    assert.equal(requests.some(r=>r.path===`/api/v1/accounts/${sessionAccountId}/session-token`&&r.options.method==='PUT'),true);
+    assert.equal(JSON.stringify(requests).includes('clientToken'),false);
+    assert.equal(JSON.stringify(requests).includes('profileId'),false);
+    assert.equal(browserWrites,0);
+  }finally{globalThis.window=oldWindow;globalThis.WebSocket=oldSocket;globalThis.fetch=oldFetch;
+    globalThis.localStorage=oldLocalStorage;globalThis.sessionStorage=oldSessionStorage}
+  client.reset();assert.equal(client.getSnapshot().bots.length,6);
+  console.log('Mock Trade, Party/Warp, Server Connection validation/reconnect, and server render: OK');
+} finally { await server.close(); }
