@@ -85,10 +85,10 @@ function BotCard({bot,compact,onAction,trade,onLiveView,viewerEnabled=true,trans
         :!active?<button className="mini primary-mini" onClick={()=>onAction(()=>client.startBot(bot.id))}><Play size={15}/> Start</button>:<button className="mini" onClick={()=>onAction(()=>client.stopBot(bot.id))}><Power size={15}/> Stop</button>}
     </div>
     {showSecondary&&<div className="card-actions secondary-actions">
-      {client.mode==='mock'&&active&&<button className="mini" onClick={()=>onAction(()=>client.recoverBot(bot.id))}><RotateCcw size={15}/> Recover</button>}
-      {client.mode==='remote'&&bot.state==='IN_PIT_IDLE'&&<button className="mini launch-test-button" onClick={()=>onAction(()=>client.testLaunchPad!(bot.id))}><ArrowRight size={15}/> Test Launch Pad</button>}
-      {client.mode==='remote'&&bot.state==='IN_PIT_IDLE'&&<button className="mini" onClick={()=>onAction(()=>client.testCarePackage!(bot.id))}><Package size={15}/> Test Care Package</button>}
-      {client.mode==='remote'&&!['DISCONNECTED','CONNECTING'].includes(bot.state)&&<button className="mini" onClick={()=>onAction(()=>client.oofBot!(bot.id))}><X size={15}/> OOF</button>}
+      {!compact&&client.mode==='mock'&&active&&<button className="mini" onClick={()=>onAction(()=>client.recoverBot(bot.id))}><RotateCcw size={15}/> Recover</button>}
+      {!compact&&client.mode==='remote'&&bot.state==='IN_PIT_IDLE'&&<button className="mini launch-test-button" onClick={()=>onAction(()=>client.testLaunchPad!(bot.id))}><ArrowRight size={15}/> Test Launch Pad</button>}
+      {!compact&&client.mode==='remote'&&bot.state==='IN_PIT_IDLE'&&<button className="mini" onClick={()=>onAction(()=>client.testCarePackage!(bot.id))}><Package size={15}/> Test Care Package</button>}
+      {!compact&&client.mode==='remote'&&!['DISCONNECTED','CONNECTING'].includes(bot.state)&&<button className="mini" onClick={()=>onAction(()=>client.oofBot!(bot.id))}><X size={15}/> OOF</button>}
       {onLiveView&&<button className="mini live-view-button" disabled={!active||!viewerEnabled} title={!viewerEnabled?'Viewer is configured for another bot':''} onClick={()=>onLiveView(bot)}><Radio size={15}/> Live View</button>}
       {!compact&&client.mode==='mock'&&<label className="select-wrap"><span className="sr-only">{bot.name} の状態</span><select value={bot.state} onChange={e=>onAction(()=>client.setBotState(bot.id,e.target.value as BotState))} aria-label={`${bot.name} の状態を試す`}>
         {botStates.map(s=><option key={s} value={s}>{s}</option>)}</select><ChevronDown size={13}/></label>}
