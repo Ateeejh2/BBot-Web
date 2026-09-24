@@ -195,6 +195,18 @@ function App(){
     {toast&&<div className="toast" role="status"><Check size={16}/>{toast}</div>}
   </div>
 }
+function carePackageProgress(item:NonNullable<Snapshot['carePackageTracking']>['instances'][number]):{label:string;detail?:string;phase?:string}{
+  switch(item.progressPhase){
+    case 'CHEST_FOUND': return {label:'Chest Found',phase:'active'};
+    case 'PATHFINDING': return {label:'Pathfinding',phase:'active'};
+    case 'PATHFIND_DONE': return {label:'Pathfind Done',phase:'active'};
+    case 'CLICKING': return {label:'Clicking',detail:item.clicksRemaining===undefined?'Reading hologram…':`Remain ${item.clicksRemaining} Click${item.clicksRemaining===1?'':'s'}`,phase:'active'};
+    case 'OPENED': return {label:'Opened',detail:item.gotItems?.length?`Priority loot: ${item.gotItems.join(', ')}`:undefined,phase:'opened'};
+    case 'GOT': return {label:'Got',detail:item.gotItems?.length?item.gotItems.join(', '):'Care Package completed',phase:'got'};
+    case 'FAIL': return {label:'Fail',detail:item.failureReason??'Care Package processing failed',phase:'fail'};
+    default: return {label:item.state.replaceAll('_',' '),phase:'waiting'};
+  }
+}
 function CarePackagePanel({schedule,tracking}:{schedule:NonNullable<Snapshot['carePackages']>;tracking?:Snapshot['carePackageTracking']}){
   return <section className="panel care-package-panel"><SectionHead kicker="PIT EVENTS" title="Next Care Packages" action={<a className="link" href={schedule.sourceUrl} target="_blank" rel="noreferrer">brookeafk.com <ArrowRight size={15}/></a>}/>
     <div className="care-package-meta"><span className={`source-state ${schedule.status.toLowerCase()}`}>{schedule.status}</span><span>{schedule.updatedAt?`Updated ${rel(schedule.updatedAt)}`:'Waiting for first update'}</span></div>
@@ -202,7 +214,10 @@ function CarePackagePanel({schedule,tracking}:{schedule:NonNullable<Snapshot['ca
       <span className="care-package-icon"><Package size={17}/></span><span className="care-package-rank">#{index+1}</span><div><strong>Care Package</strong><small>{eventClock(event.timestamp)}</small></div><b className="care-package-countdown">{eventCountdown(event.timestamp)}</b>
     </div>)}</div>:<p className="care-package-empty">{schedule.status==='UNAVAILABLE'?'イベント情報を取得できていません。':'今後のCare Packageが見つかりません。'}</p>}
     {tracking?.timestamp&&<div className="care-tracking"><div className="care-tracking-head"><span>LIVE TRACKING</span><b>{eventClock(tracking.timestamp)}</b></div>
-      {tracking.instances.length?tracking.instances.map(item=><div className="care-tracking-row" key={item.instanceId}><span className="mono">{item.instanceId}</span><Badge status={item.state}/><small>{item.target?`${item.target.x.toFixed(1)} / ${item.target.z.toFixed(1)}`:'waiting'}</small></div>):<small className="care-tracking-wait">Carrier/chest signalを待っています。</small>}
+      {tracking.instances.length?tracking.instances.map(item=>{const progress=carePackageProgress(item);return <div className="care-tracking-row" key={item.instanceId}>
+        <span className="mono">{item.instanceId}</span><Badge status={item.state}/><small>{item.target?`${item.target.x.toFixed(1)} / ${item.target.z.toFixed(1)}`:'waiting'}</small>
+        <div className={`care-progress-status ${progress.phase??''}`}><strong>{progress.label}</strong>{progress.detail&&<span>{progress.detail}</span>}</div>
+      </div>}):<small className="care-tracking-wait">Carrier/chest signalを待っています。</small>}
     </div>}
   </section>
 }
