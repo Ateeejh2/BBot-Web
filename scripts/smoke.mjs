@@ -139,7 +139,7 @@ try {
   const serverSource=await (await import('node:fs/promises')).readFile('src/ServerConnectionPanel.tsx','utf8');
   assert.match(serverSource,/remoteActive=.*startQueued/);
   const remoteAccounts=renderToString(createElement(RemoteAccountsPanel,{snapshot:remoteSnapshot,notify:()=>{}}));
-  assert.ok(remoteAccounts.includes('Add Microsoft')&&remoteAccounts.includes('Scout')&&remoteAccounts.includes('assignment'));
+  assert.ok(remoteAccounts.includes('Add Account')&&remoteAccounts.includes('Microsoft')&&remoteAccounts.includes('Scout')&&remoteAccounts.includes('Account assignment'));
   assert.equal(remoteAccounts.includes('SECRET_REFRESH_TOKEN'),false);
   assert.ok(remoteAccounts.includes('Session'));
   const sessionErrorSnapshot={...remoteSnapshot,accounts:[{id:'33333333-3333-4333-8333-333333333333',label:'Expired',kind:'SESSION',status:'ERROR',
