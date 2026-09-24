@@ -49,13 +49,13 @@ function TradePanel({bot,trade,onAction}:{bot:Bot;trade:TradeState;onAction:(tas
     </div>}
   </div>;
 }
-function BotCard({bot,compact,onAction,trade,onLiveView,transport,worker}:{bot:Bot;compact?:boolean;onAction:(task:()=>void|Promise<void>)=>void;trade?:TradeState;onLiveView?:(bot:Bot)=>void;transport?:'mineflayer'|'forge';worker?:ForgeWorker}){
+function BotCard({bot,compact,onAction,trade,onLiveView,viewerEnabled=true,transport,worker}:{bot:Bot;compact?:boolean;onAction:(task:()=>void|Promise<void>)=>void;trade?:TradeState;onLiveView?:(bot:Bot)=>void;viewerEnabled?:boolean;transport?:'mineflayer'|'forge';worker?:ForgeWorker}){
   const active=bot.state!=='DISCONNECTED'||Boolean(bot.startQueued);
   const forge=client.mode==='remote'&&transport==='forge';
   const workerPhase=worker?.phase??'STOPPED';
   const launched=workerPhase==='LAUNCHED';
   const serverDisconnectable=!['DISCONNECTED','CONNECTING'].includes(bot.state);
-  const showSecondary=!compact&&(client.mode==='mock'&&active||client.mode==='remote'&&bot.state==='IN_PIT_IDLE'||client.mode==='remote'&&!['DISCONNECTED','CONNECTING'].includes(bot.state)||Boolean(onLiveView));
+  const showSecondary=Boolean(onLiveView)||( !compact&&(client.mode==='mock'&&active||client.mode==='remote'&&bot.state==='IN_PIT_IDLE'||client.mode==='remote'&&!['DISCONNECTED','CONNECTING'].includes(bot.state)) );
   const progressLabel=workerPhase==='LAUNCHING'
     ?`Launching Forge... ${Math.max(0,Math.min(100,Math.round(worker?.launchProgress??0)))}%`
     :bot.activity?.kind==='SCANNING_CHUNKS'
@@ -89,7 +89,7 @@ function BotCard({bot,compact,onAction,trade,onLiveView,transport,worker}:{bot:B
       {client.mode==='remote'&&bot.state==='IN_PIT_IDLE'&&<button className="mini launch-test-button" onClick={()=>onAction(()=>client.testLaunchPad!(bot.id))}><ArrowRight size={15}/> Test Launch Pad</button>}
       {client.mode==='remote'&&bot.state==='IN_PIT_IDLE'&&<button className="mini" onClick={()=>onAction(()=>client.testCarePackage!(bot.id))}><Package size={15}/> Test Care Package</button>}
       {client.mode==='remote'&&!['DISCONNECTED','CONNECTING'].includes(bot.state)&&<button className="mini" onClick={()=>onAction(()=>client.oofBot!(bot.id))}><X size={15}/> OOF</button>}
-      {!compact&&<button className="mini live-view-button" disabled={!active} onClick={()=>onLiveView?.(bot)}><Radio size={15}/> Live View</button>}
+      {onLiveView&&<button className="mini live-view-button" disabled={!active||!viewerEnabled} title={!viewerEnabled?'Viewer is configured for another bot':''} onClick={()=>onLiveView(bot)}><Radio size={15}/> Live View</button>}
       {!compact&&client.mode==='mock'&&<label className="select-wrap"><span className="sr-only">{bot.name} の状態</span><select value={bot.state} onChange={e=>onAction(()=>client.setBotState(bot.id,e.target.value as BotState))} aria-label={`${bot.name} の状態を試す`}>
         {botStates.map(s=><option key={s} value={s}>{s}</option>)}</select><ChevronDown size={13}/></label>}
     </div>}
@@ -146,10 +146,10 @@ function App(){
       {client.mode==='remote'&&!snapshot.remoteConnected&&<div className="insight" role="status"><Radio size={18}/><p>backendとの接続待ちです。API_ORIGINとWebSocketプロキシを確認してください。</p></div>}
       {client.mode==='remote'&&forgeMode&&page==='bots'&&<div className="insight"><CircleHelp size={18}/><p>LaunchでForge clientを起動します。StartはSettingsのServer Connectionへ接続し、spawn確認後5秒待って /play pit を送り、instance確定後にIdleになります。DisconnectはMinecraft serverだけ切断し、QuitはForge clientを終了します。</p></div>}
       {client.mode==='remote'&&page==='jobs'&&<div className="insight"><CircleHelp size={18}/><p>Job投入後、同じinstanceのIdle Botが自動で割り当てられ、Pathfindingを開始します。最初は近い安全な座標で確認してください。</p></div>}
-      {page==='dashboard'&&<Dashboard data={snapshot} active={active} live={live} pending={pending} go={go} perform={perform}/>}
+      {page==='dashboard'&&<Dashboard data={snapshot} active={active} live={live} pending={pending} go={go} perform={perform} onLiveView={bot=>setLiveBotId(bot.id)}/>}
       {page==='bots'&&<section className="view-section"><div className="toolbar"><div className="filter-row" role="group" aria-label="Bot絞り込み">{[['all','All'],['active','Active'],['idle','Idle'],['offline','Offline']].map(([v,l])=><button key={v} className={`filter ${filter===v?'is-active':''}`} onClick={()=>setFilter(v)}>{l}</button>)}</div><div className="search-box"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Bot / Instance を検索" aria-label="Bot検索"/></div></div>
         <div className="list-label">FLEET <span>{snapshot.bots.length} / {snapshot.settings.maxBots} BOTS</span></div>
-        <div className="bot-grid">{snapshot.bots.filter(b=>(filter==='all'||filter==='active'&&(b.state!=='DISCONNECTED'||Boolean(b.startQueued))||filter==='offline'&&b.state==='DISCONNECTED'&&!b.startQueued||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.id.includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase()))).map(b=><BotCard key={b.id} bot={b} transport={snapshot.transport} worker={snapshot.forgeWorkers?.find(worker=>worker.botId===b.id)} trade={snapshot.trades[b.id]??client.getTradeState(b.id)} onAction={perform} onLiveView={bot=>setLiveBotId(bot.id)}/>)}</div>
+        <div className="bot-grid">{snapshot.bots.filter(b=>(filter==='all'||filter==='active'&&(b.state!=='DISCONNECTED'||Boolean(b.startQueued))||filter==='offline'&&b.state==='DISCONNECTED'&&!b.startQueued||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.id.includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase()))).map(b=><BotCard key={b.id} bot={b} transport={snapshot.transport} worker={snapshot.forgeWorkers?.find(worker=>worker.botId===b.id)} trade={snapshot.trades[b.id]??client.getTradeState(b.id)} onAction={perform} onLiveView={bot=>setLiveBotId(bot.id)} viewerEnabled={client.mode==='mock'||snapshot.viewer?.botId===b.id}/>)}</div>
         {!snapshot.bots.some(b=>(filter==='all'||filter==='active'&&(b.state!=='DISCONNECTED'||Boolean(b.startQueued))||filter==='offline'&&b.state==='DISCONNECTED'&&!b.startQueued||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase())))&&<Empty title="該当するBotがありません" detail="条件を変更して確認してください。"/>}</section>}
       {page==='instances'&&<section className="view-section"><div className="insight"><Activity size={18}/><p>Instance一覧は固定ではありません。Mockで追加・状態変更を試せます。確認済みの集合であり、総instance数ではありません。</p></div>
         <div className="list-label">OBSERVED INSTANCES <span>{snapshot.instances.length} FOUND</span></div><div className="instance-grid">{snapshot.instances.map(i=><InstanceCard key={i.id} id={i.id} status={i.status} count={snapshot.bots.filter(b=>b.instanceId===i.id).length} lastSeen={i.lastSeen} onAction={perform}/>)}</div></section>}
@@ -268,7 +268,7 @@ function NetworkIdentityPanel({identity}:{identity:NonNullable<Snapshot['network
     {identity.status==='UNAVAILABLE'&&<div className="network-identity-note"><Radio size={17}/><span>Backendのネットワーク診断を取得できません。Web単独起動または外部IP情報の取得失敗時はRiskをUnknownとして表示します。</span></div>}
   </section>
 }
-function Dashboard({data,active,live,pending,go,perform}:{data:Snapshot;active:number;live:number;pending:number;go:(p:Page)=>void;perform:(task:()=>void,success?:string)=>void}){
+function Dashboard({data,active,live,pending,go,perform,onLiveView}:{data:Snapshot;active:number;live:number;pending:number;go:(p:Page)=>void;perform:(task:()=>void,success?:string)=>void;onLiveView:(bot:Bot)=>void}){
   const suspect=data.instances.filter(i=>i.status==='SUSPECT').length;
   const perf=data.performance,pathBots=perf?.pathfinding.bots.filter(p=>p.pathAttempts>0)||[];
   const pings=perf?.pathfinding.bots.map(p=>p.pingMs).filter((v):v is number=>v!==undefined)||[],averagePing=pings.length?Math.round(pings.reduce((a,b)=>a+b,0)/pings.length):undefined;
@@ -296,7 +296,7 @@ function Dashboard({data,active,live,pending,go,perform}:{data:Snapshot;active:n
     </div>
     {pathBots.length>0&&<div className="path-performance-list">{pathBots.slice(0,8).map(path=><div key={path.botId}><b className="mono">{path.botId}</b><span>Ping <strong>{path.pingMs===undefined?'—':`${path.pingMs} ms`}</strong></span><span>Move <strong>{path.activePathMs!==undefined?`${path.activePathMs} ms active`:path.lastPathMs!==undefined?`${path.lastPathMs} ms`:'—'}</strong></span><span>Queue <strong>{path.lastPathQueueMs!==undefined?`${path.lastPathQueueMs} ms`:'—'}</strong></span><span>Done / Fail <strong>{path.pathCompleted} / {path.pathFailed}</strong></span></div>)}</div>}
     </section>}
-    <div className="dashboard-grid"><section className="panel roster-panel"><SectionHead kicker="LIVE ROSTER" title="Bots" action={<button className="link" onClick={()=>go('bots')}>View all <ArrowRight size={15}/></button>}/><div className="roster-list">{data.bots.slice(0,4).map(b=><BotCard key={b.id} bot={b} transport={data.transport} worker={data.forgeWorkers?.find(worker=>worker.botId===b.id)} compact onAction={perform}/>)}</div><button className="row-link" onClick={()=>go('bots')}><span>Manage all {data.bots.length} bots</span><ChevronRight size={17}/></button></section>
+    <div className="dashboard-grid"><section className="panel roster-panel"><SectionHead kicker="LIVE ROSTER" title="Bots" action={<button className="link" onClick={()=>go('bots')}>View all <ArrowRight size={15}/></button>}/><div className="roster-list">{data.bots.slice(0,4).map(b=><BotCard key={b.id} bot={b} transport={data.transport} worker={data.forgeWorkers?.find(worker=>worker.botId===b.id)} compact onAction={perform} onLiveView={onLiveView} viewerEnabled={client.mode==='mock'||data.viewer?.botId===b.id}/>)}</div><button className="row-link" onClick={()=>go('bots')}><span>Manage all {data.bots.length} bots</span><ChevronRight size={17}/></button></section>
       <div className="dashboard-right"><section className="panel"><SectionHead kicker="NETWORK" title="Instances" action={<button className="link" onClick={()=>go('instances')}>View all <ArrowRight size={15}/></button>}/><div className="overview-instances">{data.instances.slice(0,4).map(i=><div className="instance-line" key={i.id}><span className={`ring ${tone(i.status)}`}><Layers3 size={16}/></span><div><strong className="mono">{i.id}</strong><small>{data.bots.filter(b=>b.instanceId===i.id).length} bots</small></div><Badge status={i.status}/></div>)}</div></section>
         <section className="panel recent-panel"><SectionHead kicker="ACTIVITY" title="Recent events" action={<button className="link" onClick={()=>go('logs')}>Logs <ArrowRight size={15}/></button>}/><div className="recent-list">{data.logs.slice(0,3).map(l=><div className="recent-row" key={l.id}><span className={`tiny-dot ${l.level.toLowerCase()}`}/><div><strong>{l.message}</strong><small>{rel(l.at)}</small></div></div>)}</div></section>
       </div></div>
