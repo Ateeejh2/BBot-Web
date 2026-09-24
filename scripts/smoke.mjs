@@ -155,9 +155,9 @@ try {
   assert.match(sessionSource,/id="session-replace-token"[^>]*type="password"[^>]*autoComplete="off"/);
   assert.match(sessionSource,/replaceToken\.current\.value=''/);
   assert.ok(sessionSource.includes('Replace Token'));
-  assert.match(sessionSource,/const botUnavailable=.*startQueued/);
+  assert.ok(sessionSource.includes('const botUnavailable=')&&sessionSource.includes('Boolean(bot.startQueued)')&&sessionSource.includes("worker.phase!=='STOPPED'"));
   assert.match(sessionSource,/disabled=\{busy\|\|botUnavailable\(account\.assignedBot\)\}/);
-  assert.match(sessionSource,/disabled=\{busy\|\|bot\.state!==\'DISCONNECTED\'\|\|Boolean\(bot\.startQueued\)\}/);
+  assert.match(sessionSource,/disabled=\{busy\|\|botUnavailable\(bot\.id\)\}/);
   const appSource=await (await import('node:fs/promises')).readFile('src/App.tsx','utf8');
   assert.ok(appSource.includes('Submit Job')&&appSource.includes('client.submitJob!'));
   assert.ok(appSource.includes('Attempts')&&appSource.includes('Last failure')&&appSource.includes('Retry'));
