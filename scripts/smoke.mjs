@@ -171,6 +171,7 @@ try {
   assert.ok(appSource.includes('Movement Debug Mode')&&appSource.includes('Connect → Pathfind only')&&appSource.includes('client.setMovementDebug!'));
   assert.ok(appSource.includes('client.launchForge!')&&appSource.includes('client.quitForge!'));
   assert.ok(appSource.includes('Launch')&&appSource.includes('Disconnect')&&appSource.includes('Forge Worker'));
+  assert.ok(appSource.includes('Live View')&&appSource.includes('viewerEnabled={client.mode===\'mock\'||data.viewer?.botId===b.id}'));
   assert.ok(appSource.includes('BAN detected')&&appSource.includes('KICK detected')&&appSource.includes('Saved on this account')&&appSource.includes("moderation.kind==='BAN'"));
   const { RemoteBBotClient } = await server.ssrLoadModule('/src/client/remote.ts');
   const oldWindow=globalThis.window,oldSocket=globalThis.WebSocket,oldFetch=globalThis.fetch;
