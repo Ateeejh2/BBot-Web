@@ -33,7 +33,8 @@ export interface NetworkIdentitySnapshot {
   checkedAt?:number;
 }
 export interface CarePackageSchedule { source:'brookeafk.com'; sourceUrl:string; updatedAt?:number; status:'OK'|'STALE'|'UNAVAILABLE'; events:Array<{timestamp:number}> }
-export interface CarePackageTracking { timestamp?:number; instances:Array<{instanceId:string;state:'ARMED'|'STARTED'|'CARRIER_DETECTED'|'LAUNCHING'|'DROPPED'|'CHEST_DETECTED'|'LAUNCH_FAILED';startedAt?:number;area?:string;target?:{x:number;y:number;z:number}}> }
+export type CarePackageProgressPhase='CHEST_FOUND'|'PATHFINDING'|'PATHFIND_DONE'|'CLICKING'|'OPENED'|'GOT'|'FAIL';
+export interface CarePackageTracking { timestamp?:number; instances:Array<{instanceId:string;state:'ARMED'|'STARTED'|'CARRIER_DETECTED'|'LAUNCHING'|'DROPPED'|'CHEST_DETECTED'|'LAUNCH_FAILED'|'ENDED';startedAt?:number;area?:string;target?:{x:number;y:number;z:number};progressPhase?:CarePackageProgressPhase;clicksRemaining?:number;gotItems?:string[];failureReason?:string;progressUpdatedAt?:number}> }
 export interface Account { id:string; label:string; kind:AccountKind; status:'READY'|'UNASSIGNED'|'WAITING_FOR_LOGIN'|'ERROR'; minecraftName?:string; assignedBot?:string; createdAt:number; authError?:'SESSION_TOKEN_INVALID'; ban?:{kind:'BAN';reason:string;detectedAt:number} }
 export interface MicrosoftAuthChallenge { verificationUri:string; userCode:string; expiresAt:number }
 export interface SessionAccountInput { accessToken:string }
