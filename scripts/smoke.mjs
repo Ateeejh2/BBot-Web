@@ -166,6 +166,7 @@ try {
   assert.ok(appSource.includes('Hypixel公式のSecurity Block判定やban確率を再現したものではありません'));
   assert.ok(appSource.includes("status:'UNAVAILABLE'")&&appSource.includes("level:'Unknown'"));
   assert.ok(appSource.includes('Next Care Packages')&&appSource.includes('brookeafk.com')&&appSource.includes('care-package-countdown'));
+  assert.ok(appSource.includes('Chest Found')&&appSource.includes('Pathfind Done')&&appSource.includes('Remain ')&&appSource.includes('Opened')&&appSource.includes('Priority loot:')&&appSource.includes('Care Package completed'));
   assert.ok(appSource.includes('PREPARING_EVENT')&&appSource.includes('LIVE TRACKING')&&appSource.includes('CARRIER_DETECTED'));
   assert.ok(appSource.includes('Test Launch Pad')&&appSource.includes('client.testLaunchPad!'));
   assert.ok(appSource.includes('Movement Debug Mode')&&appSource.includes('Connect → Pathfind only')&&appSource.includes('client.setMovementDebug!'));
