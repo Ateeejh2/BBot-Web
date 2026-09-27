@@ -2,7 +2,6 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Activity, AlertTriangle, ArrowRight, Bot as BotIcon, Check, ChevronDown, ChevronRight, CircleHelp, Database, LayoutDashboard, Layers3, ListChecks, MoreHorizontal, Package, Play, Plus, Power, Radio, RotateCcw, ScrollText, Search, Settings2, ShieldCheck, Users, X } from 'lucide-react';
 import { bbotClient as client } from './client';
 import { ServerConnectionPanel } from './ServerConnectionPanel';
-import { LiveViewModal } from './LiveViewModal';
 import { RemoteAccountsPanel } from './RemoteAccountsPanel';
 import { botStates, validMinecraftUsername, type AccountKind, type Bot, type BotState, type ChatLogEntry, type ForgeWorker, type InstanceStatus, type JobStatus, type LogEntry, type PartyCommandResult, type Snapshot, type TradeItem, type TradeState } from './client/types';
 type Page = 'dashboard'|'bots'|'instances'|'jobs'|'accounts'|'settings'|'logs'|'chat-debug';
@@ -49,13 +48,13 @@ function TradePanel({bot,trade,onAction}:{bot:Bot;trade:TradeState;onAction:(tas
     </div>}
   </div>;
 }
-function BotCard({bot,compact,onAction,trade,onLiveView,viewerEnabled=true,transport,worker}:{bot:Bot;compact?:boolean;onAction:(task:()=>void|Promise<void>)=>void;trade?:TradeState;onLiveView?:(bot:Bot)=>void;viewerEnabled?:boolean;transport?:'mineflayer'|'forge';worker?:ForgeWorker}){
+function BotCard({bot,compact,onAction,trade,transport,worker}:{bot:Bot;compact?:boolean;onAction:(task:()=>void|Promise<void>)=>void;trade?:TradeState;transport?:'mineflayer'|'forge';worker?:ForgeWorker}){
   const active=bot.state!=='DISCONNECTED'||Boolean(bot.startQueued);
   const forge=client.mode==='remote'&&transport==='forge';
   const workerPhase=worker?.phase??'STOPPED';
   const launched=workerPhase==='LAUNCHED';
   const serverDisconnectable=!['DISCONNECTED','CONNECTING'].includes(bot.state);
-  const showSecondary=Boolean(onLiveView)||( !compact&&(client.mode==='mock'&&active||client.mode==='remote'&&bot.state==='IN_PIT_IDLE'||client.mode==='remote'&&!['DISCONNECTED','CONNECTING'].includes(bot.state)) );
+  const showSecondary=!compact&&(client.mode==='mock'&&active||client.mode==='remote'&&bot.state==='IN_PIT_IDLE'||client.mode==='remote'&&!['DISCONNECTED','CONNECTING'].includes(bot.state));
   const progressLabel=workerPhase==='LAUNCHING'
     ?`Launching Forge... ${Math.max(0,Math.min(100,Math.round(worker?.launchProgress??0)))}%`
     :bot.activity?.kind==='SCANNING_CHUNKS'
@@ -89,7 +88,6 @@ function BotCard({bot,compact,onAction,trade,onLiveView,viewerEnabled=true,trans
       {!compact&&client.mode==='remote'&&bot.state==='IN_PIT_IDLE'&&<button className="mini launch-test-button" onClick={()=>onAction(()=>client.testLaunchPad!(bot.id))}><ArrowRight size={15}/> Test Launch Pad</button>}
       {!compact&&client.mode==='remote'&&bot.state==='IN_PIT_IDLE'&&<button className="mini" onClick={()=>onAction(()=>client.testCarePackage!(bot.id))}><Package size={15}/> Test Care Package</button>}
       {!compact&&client.mode==='remote'&&!['DISCONNECTED','CONNECTING'].includes(bot.state)&&<button className="mini" onClick={()=>onAction(()=>client.oofBot!(bot.id))}><X size={15}/> OOF</button>}
-      {onLiveView&&<button className="mini live-view-button" disabled={!active||!viewerEnabled} title={!viewerEnabled?'Viewer is configured for another bot':''} onClick={()=>onLiveView(bot)}><Radio size={15}/> Live View</button>}
       {!compact&&client.mode==='mock'&&<label className="select-wrap"><span className="sr-only">{bot.name} の状態</span><select value={bot.state} onChange={e=>onAction(()=>client.setBotState(bot.id,e.target.value as BotState))} aria-label={`${bot.name} の状態を試す`}>
         {botStates.map(s=><option key={s} value={s}>{s}</option>)}</select><ChevronDown size={13}/></label>}
     </div>}
@@ -111,7 +109,6 @@ function App(){
   const [accountKind,setAccountKind]=useState<AccountKind>('SESSION'),[accountLabel,setAccountLabel]=useState('');
   const [jobInstance,setJobInstance]=useState('mega10c');
   const [jobType,setJobType]=useState('manual.event'),[jobX,setJobX]=useState('0'),[jobY,setJobY]=useState('64'),[jobZ,setJobZ]=useState('0'),[jobTtl,setJobTtl]=useState('300');
-  const [liveBotId,setLiveBotId]=useState<string|null>(null);
   useEffect(()=>{if(!more&&!accountOpen)return;const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape'){setMore(false);setAccountOpen(false)}};document.addEventListener('keydown',onKey);return()=>document.removeEventListener('keydown',onKey)},[more,accountOpen]);
   useEffect(()=>{if(!toast)return;const timer=setTimeout(()=>setToast(''),3700);return()=>clearTimeout(timer)},[toast]);
   useEffect(()=>{if(client.mode==='remote'&&snapshot.instances.length&&!snapshot.instances.some(i=>i.id===jobInstance))setJobInstance(snapshot.instances[0]!.id)},[snapshot.instances,jobInstance]);
@@ -146,10 +143,10 @@ function App(){
       {client.mode==='remote'&&!snapshot.remoteConnected&&<div className="insight" role="status"><Radio size={18}/><p>backendとの接続待ちです。API_ORIGINとWebSocketプロキシを確認してください。</p></div>}
       {client.mode==='remote'&&forgeMode&&page==='bots'&&<div className="insight"><CircleHelp size={18}/><p>LaunchでForge clientを起動します。StartはSettingsのServer Connectionへ接続し、spawn確認後5秒待って /play pit を送り、instance確定後にIdleになります。DisconnectはMinecraft serverだけ切断し、QuitはForge clientを終了します。</p></div>}
       {client.mode==='remote'&&page==='jobs'&&<div className="insight"><CircleHelp size={18}/><p>Job投入後、同じinstanceのIdle Botが自動で割り当てられ、Pathfindingを開始します。最初は近い安全な座標で確認してください。</p></div>}
-      {page==='dashboard'&&<Dashboard data={snapshot} active={active} live={live} pending={pending} go={go} perform={perform} onLiveView={bot=>setLiveBotId(bot.id)}/>}
+      {page==='dashboard'&&<Dashboard data={snapshot} active={active} live={live} pending={pending} go={go} perform={perform}/>}
       {page==='bots'&&<section className="view-section"><div className="toolbar"><div className="filter-row" role="group" aria-label="Bot絞り込み">{[['all','All'],['active','Active'],['idle','Idle'],['offline','Offline']].map(([v,l])=><button key={v} className={`filter ${filter===v?'is-active':''}`} onClick={()=>setFilter(v)}>{l}</button>)}</div><div className="search-box"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Bot / Instance を検索" aria-label="Bot検索"/></div></div>
         <div className="list-label">FLEET <span>{snapshot.bots.length} / {snapshot.settings.maxBots} BOTS</span></div>
-        <div className="bot-grid">{snapshot.bots.filter(b=>(filter==='all'||filter==='active'&&(b.state!=='DISCONNECTED'||Boolean(b.startQueued))||filter==='offline'&&b.state==='DISCONNECTED'&&!b.startQueued||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.id.includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase()))).map(b=><BotCard key={b.id} bot={b} transport={snapshot.transport} worker={snapshot.forgeWorkers?.find(worker=>worker.botId===b.id)} trade={snapshot.trades[b.id]??client.getTradeState(b.id)} onAction={perform} onLiveView={bot=>setLiveBotId(bot.id)} viewerEnabled={client.mode==='mock'||snapshot.viewer?.botId===b.id}/>)}</div>
+        <div className="bot-grid">{snapshot.bots.filter(b=>(filter==='all'||filter==='active'&&(b.state!=='DISCONNECTED'||Boolean(b.startQueued))||filter==='offline'&&b.state==='DISCONNECTED'&&!b.startQueued||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.id.includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase()))).map(b=><BotCard key={b.id} bot={b} transport={snapshot.transport} worker={snapshot.forgeWorkers?.find(worker=>worker.botId===b.id)} trade={snapshot.trades[b.id]??client.getTradeState(b.id)} onAction={perform}/>)}</div>
         {!snapshot.bots.some(b=>(filter==='all'||filter==='active'&&(b.state!=='DISCONNECTED'||Boolean(b.startQueued))||filter==='offline'&&b.state==='DISCONNECTED'&&!b.startQueued||filter==='idle'&&b.state==='IN_PIT_IDLE')&&(b.name.toLowerCase().includes(query.toLowerCase())||b.instanceId?.includes(query.toLowerCase())))&&<Empty title="該当するBotがありません" detail="条件を変更して確認してください。"/>}</section>}
       {page==='instances'&&<section className="view-section"><div className="insight"><Activity size={18}/><p>Instance一覧は固定ではありません。Mockで追加・状態変更を試せます。確認済みの集合であり、総instance数ではありません。</p></div>
         <div className="list-label">OBSERVED INSTANCES <span>{snapshot.instances.length} FOUND</span></div><div className="instance-grid">{snapshot.instances.map(i=><InstanceCard key={i.id} id={i.id} status={i.status} count={snapshot.bots.filter(b=>b.instanceId===i.id).length} lastSeen={i.lastSeen} onAction={perform}/>)}</div></section>}
@@ -191,7 +188,6 @@ function App(){
     <nav className="bottom-nav" aria-label="モバイルナビゲーション">{nav.slice(0,4).map(n=><NavButton key={n.id} {...n} page={page} setPage={go}/>)}<button className={`nav-button ${['accounts','settings','logs','chat-debug'].includes(page)?'selected':''}`} aria-expanded={more} onClick={()=>setMore(true)}><MoreHorizontal size={20}/><span>More</span></button></nav>
     {more&&<div className="overlay" onClick={()=>setMore(false)}><div className="sheet" role="dialog" aria-modal="true" aria-label="その他の画面" onClick={e=>e.stopPropagation()}><div className="sheet-head"><b>More</b><button className="icon-button" aria-label="閉じる" onClick={()=>setMore(false)}><X size={21}/></button></div>{nav.slice(4).map(n=><button className="sheet-item" key={n.id} onClick={()=>go(n.id)}><n.icon size={19}/>{n.label}<ChevronRight size={17}/></button>)}<div className="sheet-foot">{client.mode==='remote'?'REMOTE':'MOCK'} MODE · JAVA EDITION 1.8.9</div></div></div>}
     {accountOpen&&<div className="overlay" onClick={()=>setAccountOpen(false)}><div className="sheet form-sheet" role="dialog" aria-modal="true" aria-labelledby="account-title" onClick={e=>e.stopPropagation()}><div className="sheet-head"><b id="account-title">Add account</b><button className="icon-button" aria-label="閉じる" onClick={()=>setAccountOpen(false)}><X size={21}/></button></div><div className="form-body"><div className="type-tabs" role="group" aria-label="Account方式"><button className={accountKind==='SESSION'?'chosen':''} onClick={()=>setAccountKind('SESSION')}>Session Account</button><button className={accountKind==='MICROSOFT'?'chosen':''} onClick={()=>setAccountKind('MICROSOFT')}>Microsoft</button></div><label className="field-label" htmlFor="account-label">Display label</label><input id="account-label" maxLength={40} value={accountLabel} onChange={e=>setAccountLabel(e.target.value)} placeholder="例: Scout 07" autoComplete="off"/><div className="token-note"><ShieldCheck size={19}/><span>Mockではtoken入力を行いません。秘密情報は保持・保存されません。</span></div><button className="button accent full" onClick={()=>{try{client.addAccount(accountLabel,accountKind);setAccountOpen(false);setAccountLabel('');setToast('Mock Accountを追加しました')}catch(err){setToast(err instanceof Error?err.message:'追加に失敗しました')}}}><Plus size={17}/> Add Mock account</button></div></div></div>}
-    {liveBotId&&snapshot.bots.find(bot=>bot.id===liveBotId)&&<LiveViewModal bot={snapshot.bots.find(bot=>bot.id===liveBotId)!} remoteViewer={client.mode==='remote'?snapshot.viewer??null:undefined} onClose={()=>setLiveBotId(null)}/>}
     {toast&&<div className="toast" role="status"><Check size={16}/>{toast}</div>}
   </div>
 }
@@ -290,7 +286,7 @@ function NetworkIdentityPanel({identity}:{identity:NonNullable<Snapshot['network
     {identity.status==='UNAVAILABLE'&&<div className="network-identity-note"><Radio size={17}/><span>Backendのネットワーク診断を取得できません。Web単独起動または外部IP情報の取得失敗時はRiskをUnknownとして表示します。</span></div>}
   </section>
 }
-function Dashboard({data,active,live,pending,go,perform,onLiveView}:{data:Snapshot;active:number;live:number;pending:number;go:(p:Page)=>void;perform:(task:()=>void,success?:string)=>void;onLiveView:(bot:Bot)=>void}){
+function Dashboard({data,active,live,pending,go,perform}:{data:Snapshot;active:number;live:number;pending:number;go:(p:Page)=>void;perform:(task:()=>void,success?:string)=>void}){
   const suspect=data.instances.filter(i=>i.status==='SUSPECT').length;
   const perf=data.performance,pathBots=perf?.pathfinding.bots.filter(p=>p.pathAttempts>0)||[];
   const pings=perf?.pathfinding.bots.map(p=>p.pingMs).filter((v):v is number=>v!==undefined)||[],averagePing=pings.length?Math.round(pings.reduce((a,b)=>a+b,0)/pings.length):undefined;
@@ -318,7 +314,7 @@ function Dashboard({data,active,live,pending,go,perform,onLiveView}:{data:Snapsh
     </div>
     {pathBots.length>0&&<div className="path-performance-list">{pathBots.slice(0,8).map(path=><div key={path.botId}><b className="mono">{path.botId}</b><span>Ping <strong>{path.pingMs===undefined?'—':`${path.pingMs} ms`}</strong></span><span>Move <strong>{path.activePathMs!==undefined?`${path.activePathMs} ms active`:path.lastPathMs!==undefined?`${path.lastPathMs} ms`:'—'}</strong></span><span>Queue <strong>{path.lastPathQueueMs!==undefined?`${path.lastPathQueueMs} ms`:'—'}</strong></span><span>Done / Fail <strong>{path.pathCompleted} / {path.pathFailed}</strong></span></div>)}</div>}
     </section>}
-    <div className="dashboard-grid"><section className="panel roster-panel"><SectionHead kicker="LIVE ROSTER" title="Bots" action={<button className="link" onClick={()=>go('bots')}>View all <ArrowRight size={15}/></button>}/><div className="roster-list">{data.bots.slice(0,4).map(b=><BotCard key={b.id} bot={b} transport={data.transport} worker={data.forgeWorkers?.find(worker=>worker.botId===b.id)} compact onAction={perform} onLiveView={onLiveView} viewerEnabled={client.mode==='mock'||data.viewer?.botId===b.id}/>)}</div><button className="row-link" onClick={()=>go('bots')}><span>Manage all {data.bots.length} bots</span><ChevronRight size={17}/></button></section>
+    <div className="dashboard-grid"><section className="panel roster-panel"><SectionHead kicker="LIVE ROSTER" title="Bots" action={<button className="link" onClick={()=>go('bots')}>View all <ArrowRight size={15}/></button>}/><div className="roster-list">{data.bots.slice(0,4).map(b=><BotCard key={b.id} bot={b} transport={data.transport} worker={data.forgeWorkers?.find(worker=>worker.botId===b.id)} compact onAction={perform}/>)}</div><button className="row-link" onClick={()=>go('bots')}><span>Manage all {data.bots.length} bots</span><ChevronRight size={17}/></button></section>
       <div className="dashboard-right"><section className="panel"><SectionHead kicker="NETWORK" title="Instances" action={<button className="link" onClick={()=>go('instances')}>View all <ArrowRight size={15}/></button>}/><div className="overview-instances">{data.instances.slice(0,4).map(i=><div className="instance-line" key={i.id}><span className={`ring ${tone(i.status)}`}><Layers3 size={16}/></span><div><strong className="mono">{i.id}</strong><small>{data.bots.filter(b=>b.instanceId===i.id).length} bots</small></div><Badge status={i.status}/></div>)}</div></section>
         <section className="panel recent-panel"><SectionHead kicker="ACTIVITY" title="Recent events" action={<button className="link" onClick={()=>go('logs')}>Logs <ArrowRight size={15}/></button>}/><div className="recent-list">{data.logs.slice(0,3).map(l=><div className="recent-row" key={l.id}><span className={`tiny-dot ${l.level.toLowerCase()}`}/><div><strong>{l.message}</strong><small>{rel(l.at)}</small></div></div>)}</div></section>
       </div></div>
