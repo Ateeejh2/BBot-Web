@@ -3,12 +3,12 @@ import { defaultServerConnection, type ServerConnection, type ReconnectResult } 
 
 type Wire = { version:number; transport?:'mineflayer'|'forge'; forgeWorkers?:Snapshot['forgeWorkers']; bots:Array<{id:string;accountId?:string;accountLabel:string;minecraftName?:string;state:BotState;startQueued?:boolean;instanceId?:string;jobId?:string;position?:{x:number;y:number;z:number};kickReason?:string;kickedAt?:number;moderation?:Snapshot['bots'][number]['moderation'];activity?:{kind:'SCANNING_CHUNKS';progress:number}}>;
   instances:Snapshot['instances'];jobs?:Snapshot['jobs'];performance?:Snapshot['performance'];networkIdentity?:Snapshot['networkIdentity'];carePackages?:Snapshot['carePackages'];carePackageTracking?:Snapshot['carePackageTracking'];movementDebug?:boolean;logs:Array<{id:number;at:number;level:string;message:string;botId?:string;instanceId?:string;kickReason?:string;detail?:string}>;chatLogs?:Snapshot['chatLogs'];
-  viewer:{botId:string;url:string}|null;accounts?:Snapshot['accounts'];serverConnection?:Snapshot['serverConnection'] };
+accounts?:Snapshot['accounts'];serverConnection?:Snapshot['serverConnection'] };
 const unsupported = ():never => {throw Error('この操作は実Botではまだ利用できません')};
 const idleTrade = ():TradeState => ({status:'IDLE',tradeSessionId:null,targetUsername:null,revision:0,window:null});
 export class RemoteBBotClient implements BBotClient {
   readonly mode='remote' as const;
-  private current:Snapshot={bots:[],forgeWorkers:[],instances:[],jobs:[],accounts:[],logs:[],chatLogs:[],settings:{maxBots:1,pathConcurrency:2,eventPollingSeconds:10,debug:false,javaVersion:'1.8.9'},serverConnection:defaultServerConnection,trades:{},revision:0,viewer:null,remoteConnected:false};
+  private current:Snapshot={bots:[],forgeWorkers:[],instances:[],jobs:[],accounts:[],logs:[],chatLogs:[],settings:{maxBots:1,pathConcurrency:2,eventPollingSeconds:10,debug:false,javaVersion:'1.8.9'},serverConnection:defaultServerConnection,trades:{},revision:0,remoteConnected:false};
   private listeners=new Set<()=>void>();
   private socket?:WebSocket;
   private failures=0;
@@ -20,7 +20,7 @@ export class RemoteBBotClient implements BBotClient {
   private apply(data:Wire){
     if(data?.version!==1||!Array.isArray(data.bots)||!Array.isArray(data.instances)||!Array.isArray(data.logs))return;
     const kicks=new Map(data.logs.filter(l=>l.kickReason).map(l=>[l.botId,l.kickReason]));
-    this.current={...this.current,revision:++this.lastRevision,transport:data.transport??this.current.transport,forgeWorkers:data.forgeWorkers??this.current.forgeWorkers,viewer:data.viewer,instances:data.instances,jobs:data.jobs??[],performance:data.performance,networkIdentity:data.networkIdentity,carePackages:data.carePackages,carePackageTracking:data.carePackageTracking,movementDebug:Boolean(data.movementDebug),
+    this.current={...this.current,revision:++this.lastRevision,transport:data.transport??this.current.transport,forgeWorkers:data.forgeWorkers??this.current.forgeWorkers,instances:data.instances,jobs:data.jobs??[],performance:data.performance,networkIdentity:data.networkIdentity,carePackages:data.carePackages,carePackageTracking:data.carePackageTracking,movementDebug:Boolean(data.movementDebug),
       settings:{...this.current.settings,maxBots:data.bots.length},
       serverConnection:data.serverConnection??this.current.serverConnection,
       bots:data.bots.map(b=>({id:b.id,accountId:b.accountId??'',name:b.minecraftName??b.accountLabel,state:b.state,startQueued:b.startQueued,instanceId:b.instanceId,jobId:b.jobId,
